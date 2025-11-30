@@ -1,6 +1,8 @@
 const authTitle = document.getElementById('auth-title');
 const authBtn = document.getElementById('auth-btn');
 const switchAuthBtn = document.getElementById('switch-auth');
+const nameInput = document.getElementById('name');
+const passwordInput = document.getElementById('password');
 
 let isLogin = true;
 
