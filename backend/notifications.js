@@ -1,5 +1,5 @@
 function sendNotification(userId, message) {
-  // Placeholder for future notification system
+  // Placeholder for future push notification integration
   console.log(`Notify ${userId}: ${message}`);
 }
 
