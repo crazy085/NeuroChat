@@ -7,12 +7,21 @@ function initDB() {
       id TEXT PRIMARY KEY,
       name TEXT,
       password TEXT,
-      avatar TEXT
+      avatar TEXT,
+      status TEXT
     )`);
+
     db.run(`CREATE TABLE IF NOT EXISTS groups (
       id TEXT PRIMARY KEY,
       name TEXT
     )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS group_members (
+      id TEXT PRIMARY KEY,
+      groupId TEXT,
+      userId TEXT
+    )`);
+
     db.run(`CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       sender TEXT,
