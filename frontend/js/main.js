@@ -1,122 +1,127 @@
-// main.js
-const authSection = document.getElementById('auth-section');
-const authTitle = document.getElementById('auth-title');
-const nameInput = document.getElementById('name');
-const passwordInput = document.getElementById('password');
-const authBtn = document.getElementById('auth-btn');
-const switchAuthBtn = document.getElementById('switch-auth');
+const authSection = document.getElementById("auth-section");
+const mainUI = document.getElementById("main-ui");
 
-const mainUI = document.getElementById('main-ui');
-const contactsList = document.getElementById('contacts-list');
-const contactSearch = document.getElementById('contact-search');
-const currentTargetSpan = document.getElementById('current-target');
-const btnPublic = document.getElementById('btn-public');
+const nameInput = document.getElementById("name");
+const pwInput = document.getElementById("password");
+const authBtn = document.getElementById("auth-btn");
+const switchBtn = document.getElementById("switch-auth");
+const authTitle = document.getElementById("auth-title");
 
-let isLogin = true;
+let isSignup = false;
+
 let currentUser = null;
-let currentTarget = null; // null = public, otherwise userId
-let ws = null;
+let currentTarget = "public"; // public or username
 
-// toggle login / signup
-switchAuthBtn.addEventListener('click', () => {
-  isLogin = !isLogin;
-  authTitle.textContent = isLogin ? 'Login to NeuroChat' : 'Sign up for NeuroChat';
-  authBtn.textContent = isLogin ? 'Login' : 'Sign Up';
-  switchAuthBtn.textContent = isLogin ? 'Sign up' : 'Login';
+// -----------------------------
+// SWITCH LOGIN/SIGNUP
+// -----------------------------
+switchBtn.addEventListener("click", () => {
+    isSignup = !isSignup;
+
+    if (isSignup) {
+        authTitle.innerText = "Sign Up to NeuroChat";
+        authBtn.innerText = "Sign Up";
+        switchBtn.innerText = "Login";
+    } else {
+        authTitle.innerText = "Login to NeuroChat";
+        authBtn.innerText = "Login";
+        switchBtn.innerText = "Sign Up";
+    }
 });
 
-authBtn.addEventListener('click', async () => {
-  const name = nameInput.value && nameInput.value.trim();
-  const password = passwordInput.value && passwordInput.value.trim();
-  if (!name || !password) return alert('Enter name and password!');
+// -----------------------------
+// AUTH HANDLER
+// -----------------------------
+authBtn.addEventListener("click", async () => {
+    const username = nameInput.value.trim();
+    const password = pwInput.value.trim();
 
-  const url = isLogin ? '/api/login' : '/api/register';
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, password })
+    if (!username || !password) {
+        alert("Fill all fields");
+        return;
+    }
+
+    const endpoint = isSignup ? "/signup" : "/login";
+
+    const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
     });
+
     const data = await res.json();
-    if (!res.ok) return alert(data.error || 'Auth failed');
 
-    currentUser = data;
-    // hide auth, show main UI
-    authSection.classList.add('hidden');
-    mainUI.classList.remove('hidden');
+    if (!data.success) {
+        alert(data.message);
+        return;
+    }
 
-    // open websocket and init
-    openWebSocket();
+    currentUser = username;
+    authSection.classList.add("hidden");
+    mainUI.classList.remove("hidden");
 
-    // load contacts
-    await loadContacts();
-
-  } catch (e) {
-    console.error('Auth error', e);
-    alert('Auth error');
-  }
+    loadContacts();
+    initChatSocket();
 });
 
-btnPublic.addEventListener('click', () => {
-  currentTarget = null;
-  currentTargetSpan.textContent = 'Public';
-});
+// -----------------------------
+// LOAD CONTACT LIST
+// -----------------------------
+async function loadContacts() {
+    const list = document.getElementById("contacts-list");
+    list.innerHTML = "";
 
-// load contacts (initial + search)
-async function loadContacts(q = '') {
-  try {
-    const res = await fetch('/api/users' + (q ? '?q=' + encodeURIComponent(q) : ''));
+    const res = await fetch("/users");
     const users = await res.json();
-    renderContacts(users);
-  } catch (e) {
-    console.error('Failed to load contacts', e);
-  }
+
+    users
+        .filter(u => u !== currentUser)
+        .forEach(u => {
+            const div = document.createElement("div");
+            div.className = "contact-item";
+            div.innerText = u;
+
+            div.addEventListener("click", () => {
+                currentTarget = u;
+                document.getElementById("current-target").innerText = u;
+                loadChat();
+            });
+
+            list.appendChild(div);
+        });
 }
 
-function renderContacts(users) {
-  contactsList.innerHTML = '';
-  users.forEach(u => {
-    // skip current user
-    if (currentUser && u.id === currentUser.id) return;
-    const div = document.createElement('div');
-    div.className = 'contact';
-    div.innerHTML = `<div class="name">${u.name}</div><div class="status">${u.status || ''}</div>`;
-    div.addEventListener('click', () => {
-      currentTarget = u.id;
-      currentTargetSpan.textContent = u.name;
-      // clear chat container for new convo (optional)
-      document.getElementById('chat-container').innerHTML = '';
-      // Could also load conversation history via API in future
+// -----------------------------
+// SEARCH CONTACTS
+// -----------------------------
+document.getElementById("contact-search").addEventListener("input", () => {
+    const query = document.getElementById("contact-search").value.toLowerCase();
+    const items = document.querySelectorAll(".contact-item");
+
+    items.forEach(i => {
+        if (i.innerText.toLowerCase().includes(query)) i.style.display = "block";
+        else i.style.display = "none";
     });
-    contactsList.appendChild(div);
-  });
-}
-
-contactSearch.addEventListener('input', async (e) => {
-  await loadContacts(e.target.value);
 });
 
-// open ws and send init with user id
-function openWebSocket() {
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${protocol}://${window.location.host}`);
+// -----------------------------
+// SWITCH TO PUBLIC ROOM
+// -----------------------------
+document.getElementById("btn-public").addEventListener("click", () => {
+    currentTarget = "public";
+    document.getElementById("current-target").innerText = "Public";
+    loadChat();
+});
 
-  ws.addEventListener('open', () => {
-    ws.send(JSON.stringify({ type: 'init', userId: currentUser.id }));
-    console.log('WS connected and init sent');
-  });
+// -----------------------------
+// Load messages for selected chat
+// -----------------------------
+async function loadChat() {
+    const box = document.getElementById("chat-container");
+    box.innerHTML = "";
 
-  ws.addEventListener('message', (ev) => {
-    // pass to chat.js which also listens on window.ws?
-    // we'll keep a global ws for chat.js to access
-    // no-op here
-  });
+    const res = await fetch(`/messages?target=${currentTarget}&user=${currentUser}`);
+    const data = await res.json();
 
-  ws.addEventListener('close', () => console.log('WS closed'));
-  ws.addEventListener('error', (e) => console.error('WS error', e));
-
-  // export to window so chat.js can use it
-  window.__NEURO_WS = ws;
-  window.__NEURO_CURRENT_USER = currentUser;
-  window.__NEURO_CURRENT_TARGET = () => currentTarget;
+    data.forEach(m => renderMessage(m));
 }
