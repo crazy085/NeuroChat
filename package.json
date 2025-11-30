@@ -1,7 +1,7 @@
 {
   "name": "NeuroChat",
   "version": "1.0.0",
-  "description": "Full-featured chat website recreated from Bubble, now NeuroChat",
+  "description": "Full-featured chat platform with groups, file uploads, disappearing messages, notifications, and profile management.",
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js"
