@@ -1,64 +1,82 @@
-// chat.js
-const chatContainer = document.getElementById('chat-container');
-const msgInput = document.getElementById('msg-input');
-const sendBtn = document.getElementById('send-btn');
-const fileInput = document.getElementById('file-input');
-const uploadBtn = document.getElementById('upload-btn');
-const conversationSearch = document.getElementById('conversation-search');
+// -----------------------------
+// GLOBAL ELEMENTS
+// -----------------------------
+const chatContainer = document.getElementById("chat-container");
+const msgInput       = document.getElementById("msg-input");
+const sendBtn        = document.getElementById("send-btn");
+const fileInput      = document.getElementById("file-input");
+const uploadBtn      = document.getElementById("upload-btn");
+const conversationSearch = document.getElementById("conversation-search");
 
+let ws = null;
+let ACTIVE_TARGET = "public";   // username or "public"
+let CURRENT_USER = null;
+
+// main.js updates this
+window.__setUser = function (u) {
+  CURRENT_USER = u;
+};
+
+window.__setTarget = function (t) {
+  ACTIVE_TARGET = t;
+};
+
+// -----------------------------
+// TIME FORMAT
+// -----------------------------
 function formatTime(ts) {
   const d = new Date(ts);
-  return d.toLocaleTimeString();
+  return d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
 }
 
+// -----------------------------
+// RENDER A MESSAGE
+// -----------------------------
 function renderMessage(m) {
-  // m: { type:'chat', id, sender, to, groupId, content, msgType, timestamp }
-  const div = document.createElement('div');
-  div.className = 'message' + (m.sender === window.__NEURO_CURRENT_USER.name ? ' you' : '');
-  div.id = 'msg-' + m.id;
+  const div = document.createElement("div");
 
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  meta.textContent = `${m.sender} • ${formatTime(m.timestamp)}` + (m.to ? ' • private' : (m.groupId ? ' • group' : ''));
+  const isMe = m.sender === CURRENT_USER;
+  div.className = "message" + (isMe ? " you" : "");
+  div.id = "msg-" + m.id;
+
+  // META
+  const meta = document.createElement("div");
+  meta.className = "meta";
+
+  meta.textContent = `${m.sender} • ${formatTime(m.timestamp)}`
+        + (m.to ? " • private" : "");
+
   div.appendChild(meta);
 
-  if (m.msgType === 'file') {
-    // show preview for images and videos, otherwise link
-    const lc = m.content.toLowerCase();
-    if (lc.match(/\.(png|jpe?g|gif|webp)$/)) {
-      const img = document.createElement('img');
+  // BODY
+  if (m.msgType === "file") {
+    const lower = m.content.toLowerCase();
+
+    if (/\.(png|jpg|jpeg|gif|webp)$/i.test(lower)) {
+      const img = document.createElement("img");
       img.src = m.content;
-      img.style.maxWidth = '320px';
-      img.style.borderRadius = '6px';
+      img.className = "chat-image";
       div.appendChild(img);
-      const a = document.createElement('a');
-      a.href = m.content;
-      a.textContent = 'Download';
-      a.className = 'file-link';
-      a.download = '';
-      div.appendChild(a);
-    } else if (lc.match(/\.(mp4|webm|ogg)$/)) {
-      const vid = document.createElement('video');
+    } else if (/\.(mp4|webm|ogg)$/i.test(lower)) {
+      const vid = document.createElement("video");
       vid.src = m.content;
       vid.controls = true;
-      vid.style.maxWidth = '320px';
+      vid.className = "chat-video";
       div.appendChild(vid);
-      const a = document.createElement('a');
-      a.href = m.content;
-      a.textContent = 'Download';
-      a.className = 'file-link';
-      a.download = '';
-      div.appendChild(a);
-    } else {
-      const a = document.createElement('a');
-      a.href = m.content;
-      a.textContent = 'Download file';
-      a.className = 'file-link';
-      a.download = '';
-      div.appendChild(a);
     }
+
+    // Download link
+    const a = document.createElement("a");
+    a.href = m.content;
+    a.download = "";
+    a.textContent = "Download";
+    a.className = "file-link";
+    div.appendChild(a);
+
   } else {
-    const p = document.createElement('div');
+    // TEXT
+    const p = document.createElement("div");
+    p.className = "text-msg";
     p.textContent = m.content;
     div.appendChild(p);
   }
@@ -67,107 +85,124 @@ function renderMessage(m) {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-function initWSListeners() {
-  const ws = window.__NEURO_WS;
-  if (!ws) return setTimeout(initWSListeners, 200);
+// -----------------------------
+// INIT WEBSOCKET
+// -----------------------------
+function initChatSocket() {
+  ws = new WebSocket(location.origin.replace("http", "ws"));
 
-  ws.addEventListener('message', ev => {
+  ws.onopen = () => {
+    console.log("WebSocket connected");
+
+    ws.send(JSON.stringify({
+      type: "identify",
+      user: CURRENT_USER
+    }));
+  };
+
+  ws.onmessage = (ev) => {
     let data;
-    try { data = JSON.parse(ev.data); } catch (e) { return; }
+    try { data = JSON.parse(ev.data); }
+    catch (e) { return; }
 
-    if (data.type === 'chat') {
-      // If private message and not for me, skip (server sent only to sender+target; but broadcasted messages include group/public)
-      const currentUser = window.__NEURO_CURRENT_USER;
-      const currentTargetGetter = window.__NEURO_CURRENT_TARGET || (() => null);
-      const activeTarget = currentTargetGetter();
-
-      // If message is private (data.to set), show if current user is sender or recipient and if activeTarget corresponds
+    if (data.type === "chat") {
+      // PRIVATE MESSAGE FILTER
       if (data.to) {
-        if (data.to !== currentUser.id && data.sender !== currentUser.name && data.sender !== currentUser.id) {
-          // not for me
-          return;
-        }
-        // If the active target is the conversation partner OR public is fine
-        // If activeTarget is null (public) and message is private skip display
-        if (!activeTarget && data.to) {
-          // active is public but message is private -> don't show
-          if (data.sender !== currentUser.name && data.to !== currentUser.id) return;
-        }
+        // Only show if I'm sender or recipient AND target is this user
+        if (data.to !== CURRENT_USER && data.sender !== CURRENT_USER) return;
+        if (ACTIVE_TARGET !== data.sender && ACTIVE_TARGET !== data.to) return;
       } else {
-        // public/group messages: if activeTarget is a user (private convo), skip public messages
-        if (activeTarget) return;
+        // PUBLIC message filter: only show in public mode
+        if (ACTIVE_TARGET !== "public") return;
       }
 
       renderMessage(data);
-    } else if (data.type === 'delete') {
-      const el = document.getElementById('msg-' + data.id);
-      if (el) el.remove();
-    } else if (data.type === 'init_ok') {
-      console.log('WS init ok for', data.userId);
     }
-  });
+
+    else if (data.type === "delete") {
+      const el = document.getElementById("msg-" + data.id);
+      if (el) el.remove();
+    }
+  };
+
+  ws.onclose = () => {
+    console.warn("WebSocket closed, reconnecting...");
+    setTimeout(initChatSocket, 1200);
+  };
+
+  window.__NEURO_WS = ws;
 }
 
-// send message (with to if private)
-sendBtn.addEventListener('click', () => {
-  const ws = window.__NEURO_WS;
-  const currentUser = window.__NEURO_CURRENT_USER;
-  const currentTargetGetter = window.__NEURO_CURRENT_TARGET || (() => null);
-  const target = currentTargetGetter();
+// Export for main.js
+window.__initChatSocket = initChatSocket;
 
-  if (!ws || ws.readyState !== WebSocket.OPEN) return alert('Not connected');
-  const text = msgInput.value && msgInput.value.trim();
+// -----------------------------
+// SEND MESSAGE
+// -----------------------------
+sendBtn.addEventListener("click", () => {
+  const text = msgInput.value.trim();
   if (!text) return;
 
-  const disappearTime = parseInt(document.getElementById('disappear-time')?.value) || null;
-
-  const payload = {
-    type: 'chat',
-    sender: currentUser.name,
-    content: text,
-    msgType: 'text',
-    disappearTime
-  };
-  if (target) payload.to = target; // private
-  ws.send(JSON.stringify(payload));
-  msgInput.value = '';
-});
-
-// upload button
-uploadBtn.addEventListener('click', async () => {
-  const file = fileInput.files[0];
-  if (!file) return alert('Select a file');
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    const res = await fetch('/api/upload', { method: 'POST', body: form });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error || 'Upload failed');
-    const ws = window.__NEURO_WS;
-    const currentUser = window.__NEURO_CURRENT_USER;
-    const target = (window.__NEURO_CURRENT_TARGET || (() => null))();
-
-    const payload = {
-      type: 'chat',
-      sender: currentUser.name,
-      content: data.url,
-      msgType: 'file'
-    };
-    if (target) payload.to = target;
-    ws.send(JSON.stringify(payload));
-  } catch (e) {
-    console.error('Upload error', e);
-    alert('Upload failed');
+  if (!ws || ws.readyState !== 1) {
+    alert("Not connected!");
+    return;
   }
+
+  const disappearTime = parseInt(
+    document.getElementById("disappear-time").value
+  ) || null;
+
+  ws.send(JSON.stringify({
+    type: "chat",
+    sender: CURRENT_USER,
+    content: text,
+    msgType: "text",
+    to: ACTIVE_TARGET !== "public" ? ACTIVE_TARGET : null,
+    disappearTime
+  }));
+
+  msgInput.value = "";
 });
 
-// message search
-conversationSearch.addEventListener('input', e => {
-  const term = e.target.value.toLowerCase();
-  document.querySelectorAll('.message').forEach(msg => {
-    msg.style.display = msg.textContent.toLowerCase().includes(term) ? '' : 'none';
+// -----------------------------
+// UPLOAD FILE
+// -----------------------------
+uploadBtn.addEventListener("click", async () => {
+  const file = fileInput.files[0];
+  if (!file) return alert("Select a file");
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch("/api/upload", {
+    method: "POST",
+    body: form
+  });
+
+  const data = await res.json();
+
+  if (!data.url) {
+    alert("Upload failed");
+    return;
+  }
+
+  ws.send(JSON.stringify({
+    type: "chat",
+    sender: CURRENT_USER,
+    content: data.url,
+    msgType: "file",
+    to: ACTIVE_TARGET !== "public" ? ACTIVE_TARGET : null
+  }));
+});
+
+// -----------------------------
+// SEARCH MESSAGES
+// -----------------------------
+conversationSearch.addEventListener("input", () => {
+  const term = conversationSearch.value.toLowerCase();
+
+  document.querySelectorAll(".message").forEach(m => {
+    m.style.display = m.textContent.toLowerCase().includes(term)
+        ? "block" : "none";
   });
 });
-
-// initialize ws listeners after login
-initWSListeners();
