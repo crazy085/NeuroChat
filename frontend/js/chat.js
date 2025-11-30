@@ -5,8 +5,9 @@ const fileInput = document.getElementById('file-input');
 const uploadBtn = document.getElementById('upload-btn');
 const contactSearch = document.getElementById('contact-search');
 const conversationSearch = document.getElementById('conversation-search');
+const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-const ws = new WebSocket(`ws://${window.location.host}`);
 
 ws.onmessage = e => {
   const data = JSON.parse(e.data);
