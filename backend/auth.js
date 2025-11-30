@@ -19,4 +19,12 @@ function loginUser(req, res) {
   });
 }
 
-module.exports = { registerUser, loginUser };
+function updateProfile(req, res) {
+  const { id, name, status, avatar } = req.body;
+  db.run('UPDATE users SET name=?, status=?, avatar=? WHERE id=?', [name, status, avatar, id], err => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ id, name, status, avatar });
+  });
+}
+
+module.exports = { registerUser, loginUser, updateProfile };
