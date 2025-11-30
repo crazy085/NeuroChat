@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroChat</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="login-section">
+  <h2>Login to NeuroChat</h2>
+  <input type="text" id="name" placeholder="Name">
+  <input type="password" id="password" placeholder="Password">
+  <button id="login-btn">Login</button>
+</div>
+
+<div id="chat-section" class="hidden">
+  <div id="header">
+    <h2>NeuroChat</h2>
+    <button id="toggle-dark">Dark Mode</button>
+  </div>
+  <div id="chat-container"></div>
+  <input type="text" id="msg-input" placeholder="Type a message">
+  <button id="send-btn">Send</button>
+</div>
+
+<script src="js/main.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/darkmode.js"></script>
+</body>
+</html>
