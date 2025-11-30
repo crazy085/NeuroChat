@@ -1,19 +1,19 @@
 const authTitle = document.getElementById('auth-title');
 const authBtn = document.getElementById('auth-btn');
-const toggleAuth = document.getElementById('switch-auth');
+const switchAuthBtn = document.getElementById('switch-auth');
 
-let isLogin = true; // true = login, false = signup
+let isLogin = true;
 
-toggleAuth.addEventListener('click', () => {
+switchAuthBtn.addEventListener('click', () => {
   isLogin = !isLogin;
   authTitle.textContent = isLogin ? 'Login to NeuroChat' : 'Sign up for NeuroChat';
   authBtn.textContent = isLogin ? 'Login' : 'Sign Up';
-  toggleAuth.textContent = isLogin ? 'Sign up' : 'Login';
+  switchAuthBtn.textContent = isLogin ? 'Sign up' : 'Login';
 });
 
 authBtn.addEventListener('click', async () => {
-  const name = nameInput.value;
-  const password = passwordInput.value;
+  const name = document.getElementById('name').value;
+  const password = document.getElementById('password').value;
 
   if (!name || !password) return alert('Enter name and password!');
 
