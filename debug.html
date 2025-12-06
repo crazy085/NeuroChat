@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroChat - Debug Information</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .status {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success { background-color: #4caf50; }
+        .error { background-color: #f44336; }
+        .warning { background-color: #ff9800; }
+        .section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+        .item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+        }
+        .item .status {
+            margin-left: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .code {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 0 5px;
+        }
+        .info {
+            font-size: 0.9rem;
+            color: #ddd;
+            margin-top: 5px;
+        }
+        .button {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 10px 5px;
+            text-decoration: none;
+            display: inline-block;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background: #45a049;
+        }
+        .back-link {
+            color: white;
+            text-decoration: underline;
+            margin-top: 20px;
+            display: inline-block;
+        }
+        .browser-info {
+            font-size: 0.8rem;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 NeuroChat Debug Information</h1>
+        
+        <div id="loadingStatus" class="status warning">
+            Checking dependencies...
+        </div>
+
+        <div id="results"></div>
+
+        <section>
+            <h2>📁 File Structure Check</h2>
+            <div id="fileResults"></div>
+        </section>
+
+        <section>
+            <h2>🌐 Browser Information</h2>
+            <div id="browserInfo"></div>
+        </section>
+
+        <section>
+            <h2>📦 JavaScript Modules</h2>
+            <div id="moduleResults"></div>
+        </section>
+
+        <section>
+            <h2>🎯 DOM Elements</h2>
+            <div id="domResults"></div>
+        </section>
+
+        <section>
+            <h2>🔧 Quick Actions</h2>
+            <button class="button" onclick="checkLocalStorage()">
+                📋 Check LocalStorage
+            </button>
+            <button class="button" onclick="clearLocalStorage()">
+                🗑️ Clear LocalStorage
+            </button>
+            <button class="button" onclick="reloadApp()">
+                🔄 Reload App
+            </button>
+        </section>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="index.html" class="back-link">← Back to App</a>
+        </div>
+    </div>
+
+    <script>
+        // Check file structure
+        function checkFiles() {
+            const fileResults = document.getElementById('fileResults');
+            const files = [
+                'index.html',
+                'css/styles.css',
+                'server.js',
+                'package.json',
+                '.gitignore',
+                'js/utils/constants.js',
+                'js/utils/helpers.js',
+                'js/services/StorageService.js',
+                'js/services/AuthService.js',
+                'js/services/ChatService.js',
+                'js/services/RealtimeService.js',
+                'js/models/User.js',
+                'js/models/Chat.js',
+                'js/models/Message.js',
+                'js/components/Notification.js',
+                'js/components/Modal.js',
+                'js/components/LoginScreen.js',
+                'js/components/ChatList.js',
+                'js/components/ChatWindow.js',
+                'js/app.js'
+            ];
+
+            let html = '<h3>File Status:</h3>';
+            files.forEach(file => {
+                const status = fetch(file, { method: 'HEAD' })
+                    .then(() => '✅ Found')
+                    .catch(() => '❌ Missing');
+                
+                html += `
+                    <div class="item">
+                        <span>${file}</span>
+                        <span class="status ${status.includes('✅') ? 'success' : 'error'}">${status}</span>
+                    </div>
+                `;
+            });
+
+            fileResults.innerHTML = html;
+        }
+
+        // Check browser compatibility
+        function checkBrowser() {
+            const browserInfo = document.getElementById('browserInfo');
+            const features = [
+                { name: 'localStorage', supported: !!window.localStorage },
+                { name: 'sessionStorage', supported: !!window.sessionStorage },
+                { name: 'File API', supported: !!(window.File && window.FileReader) },
+                { name: 'MediaRecorder API', supported: !!(window.MediaRecorder) },
+                { name: 'getUserMedia', supported: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) },
+                { name: 'Service Workers', supported: !!window.ServiceWorker },
+                { name: 'Fetch API', supported: !!window.fetch },
+                { name: 'ES6 Modules', supported: !!(window.importScripts) }
+            ];
+
+            let html = '<h3>Browser Compatibility:</h3>';
+            features.forEach(feature => {
+                html += `
+                    <div class="item">
+                        <span>${feature.name}</span>
+                        <span class="status ${feature.supported ? 'success' : 'warning'}">${feature.supported ? '✅' : '⚠️'} ${feature.supported ? 'Supported' : 'Not Supported'}</span>
+                    </div>
+                `;
+            });
+
+            html += `
+                <div class="browser-info">
+                    <div class="item">
+                        <span>User Agent:</span>
+                        <span>${navigator.userAgent}</span>
+                    </div>
+                    <div class="item">
+                        <span>Platform:</span>
+                        <span>${navigator.platform}</span>
+                    </div>
+                    <div class="item">
+                        <span>Language:</span>
+                        <span>${navigator.language}</span>
+                    </div>
+                </div>
+            `;
+
+            browserInfo.innerHTML = html;
+        }
+
+        // Check JavaScript modules
+        function checkModules() {
+            const moduleResults = document.getElementById('moduleResults');
+            const requiredModules = [
+                'Helpers',
+                'APP_CONSTANTS',
+                'USER_STATUS',
+                'CHAT_TYPES',
+                'MESSAGE_STATUS',
+                'STORAGE_KEYS',
+                'ERROR_MESSAGES',
+                'SUCCESS_MESSAGES',
+                'NOTIFICATION_TYPES',
+                'EMOJI_CATEGORIES',
+                'storageService',
+                'authService',
+                'chatService',
+                'realtimeService',
+                'notificationSystem',
+                'modalSystem',
+                'loginScreen',
+                'chatList',
+                'chatWindow',
+                'User',
+                'Chat',
+                'Message'
+            ];
+
+            let html = '<h3>JavaScript Modules:</h3>';
+            requiredModules.forEach(module => {
+                const status = window[module] ? '✓ Loaded' : '❌ Missing';
+                html += `
+                    <div class="item">
+                        <span class="code">${module}</span>
+                        <span class="status ${status.includes('✓') ? 'success' : 'error'}">${status}</span>
+                    </div>
+                `;
+            });
+
+            moduleResults.innerHTML = html;
+        }
+
+        // Check DOM elements
+        function checkDOM() {
+            const domResults = document.getElementById('domResults');
+            const requiredElements = [
+                'loadingScreen',
+                'loginScreen',
+                'chatScreen',
+                'modalOverlay',
+                'newChatModal',
+                'settingsModal',
+                'profileModal',
+                'notificationContainer'
+            ];
+
+            let html = '<h3>DOM Elements:</h3>';
+            requiredElements.forEach(elementId => {
+                const element = document.getElementById(elementId);
+                const status = element ? '✓ Found' : '❌ Missing';
+                html += `
+                    <div class="item">
+                        <span class="code">${elementId}</span>
+                        <span class="status ${status.includes('✓') ? 'success' : 'error'}">${status}</span>
+                    </div>
+                `;
+            });
+
+            // Check form elements
+            const formElements = [
+                'loginForm',
+                'signupForm',
+                'loginUsername',
+                'loginPassword',
+                'signupUsername',
+                'signupEmail',
+                'signupPassword',
+                'signupConfirmPassword',
+                'messageInput',
+                'sendButton',
+                'searchInput'
+            ];
+
+            html += '<h4>Form Elements:</h4>';
+            formElements.forEach(elementId => {
+                const element = document.getElementById(elementId);
+                const status = element ? '✓ Found' : '❌ Missing';
+                html += `
+                    <div class="item">
+                        <span class="code">${elementId}</span>
+                        <span class="status ${status.includes('✓') ? 'success' : 'error'}">${status}</span>
+                    </div>
+                `;
+            });
+
+            domResults.innerHTML = html;
+        }
+
+        // Check LocalStorage
+        function checkLocalStorage() {
+            const loadingStatus = document.getElementById('loadingStatus');
+            
+            try {
+                const keys = Object.keys(localStorage);
+                const data = {};
+                let totalSize = 0;
+                
+                keys.forEach(key => {
+                    if (key.startsWith('neurochat_')) {
+                        const value = localStorage.getItem(key);
+                        data[key] = value;
+                        totalSize += key.length + (value ? value.length : 0);
+                    }
+                });
+
+                loadingStatus.className = 'status success';
+                loadingStatus.textContent = `✅ LocalStorage working - ${keys.length} neurochat keys, ${totalSize} bytes`;
+
+                console.log('LocalStorage Data:', data);
+                
+            } catch (error) {
+                loadingStatus.className = 'status error';
+                loadingStatus.textContent = `❌ LocalStorage error: ${error.message}`;
+            }
+        }
+
+        // Clear LocalStorage
+        function clearLocalStorage() {
+            if (confirm('Are you sure you want to clear all NeuroChat data? This cannot be undone!')) {
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => {
+                    if (key.startsWith('neurochat_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                
+                checkLocalStorage();
+                alert('LocalStorage cleared! Refresh the page to start fresh.');
+            }
+        }
+
+        // Reload app
+        function reloadApp() {
+            location.reload();
+        }
+
+        // Initialize all checks
+        function initialize() {
+            setTimeout(() => {
+                checkFiles();
+                checkBrowser();
+                checkModules();
+                checkDOM();
+                
+                const loadingStatus = document.getElementById('loadingStatus');
+                if (document.getElementById('loadingScreen') && 
+                    document.getElementById('loginScreen') && 
+                    document.getElementById('chatScreen')) {
+                    loadingStatus.className = 'status success';
+                    loadingStatus.textContent = '✅ All core components loaded successfully';
+                }
+            }, 500);
+        }
+
+        // Run initialization
+        initialize();
+
+        // Auto-refresh every 5 seconds
+        setInterval(() => {
+            console.log('Auto-refreshing debug info...');
+            initialize();
+        }, 5000);
+    </script>
+</body>
+</html>
