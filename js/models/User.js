@@ -3,7 +3,7 @@ class User {
     constructor(data = {}) {
         this.id = data.id || Helpers.generateId();
         this.username = data.username || '';
-        this.email = data.email || '';
+        this.email = data.email || ''; // Keep email but make it optional
         this.password = data.password || '';
         this.avatar = data.avatar || Helpers.generateAvatar(this.username);
         this.status = data.status || USER_STATUS.ONLINE;
@@ -86,12 +86,19 @@ class User {
             errors.push('Username must be at least 3 characters');
         }
         
-        if (!this.email || !Helpers.validateEmail(this.email)) {
-            errors.push('Valid email is required');
-        }
-        
         if (!this.password || this.password.length < 6) {
             errors.push('Password must be at least 6 characters');
+        }
+        
+        // Check for valid username (alphanumeric and underscore only)
+        const usernameRegex = /^[a-zA-Z0-9_]+$/;
+        if (!usernameRegex.test(this.username)) {
+            errors.push('Username can only contain letters, numbers, and underscores');
+        }
+        
+        // Validate email if provided
+        if (this.email && !Helpers.validateEmail(this.email)) {
+            errors.push('Please enter a valid email address');
         }
         
         return {
