@@ -8,14 +8,16 @@ const PORT = process.env.PORT || 3000;
 // Enable CORS for all routes
 app.use(cors());
 
-// Serve static files from the current directory
+// Serve static files from current directory
 app.use(express.static(__dirname));
 
-// For any request that doesn't match a static file, serve index.html
+// Handle all other routes by serving index.html
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Start server
 app.listen(PORT, () => {
-  console.log(`NeuroChat server running on port ${PORT}`);
+  console.log(`🚀 NeuroChat server running on port ${PORT}`);
+  console.log(`📱 Open http://localhost:${PORT} in your browser`);
 });
