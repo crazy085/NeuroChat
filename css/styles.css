@@ -311,6 +311,13 @@ body.dark-mode ::-webkit-scrollbar-thumb:hover {
 /* ===== Login Screen ===== */
 .login-screen {
     background: linear-gradient(135deg, var(--bg-primary) 0%, #e8eaf0 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    min-height: 100vh;
+    overflow-y: auto; /* Make it scrollable */
+    box-sizing: border-box;
 }
 
 body.dark-mode .login-screen {
@@ -321,6 +328,9 @@ body.dark-mode .login-screen {
     width: 100%;
     max-width: 450px;
     padding: 20px;
+    max-height: 100vh; /* Ensure it doesn't exceed viewport */
+    box-sizing: border-box;
+    overflow-y: auto; /* Make container scrollable */
 }
 
 .login-card {
@@ -329,6 +339,7 @@ body.dark-mode .login-screen {
     padding: 40px;
     box-shadow: var(--shadow-xl);
     backdrop-filter: blur(10px);
+    margin-bottom: 40px; /* Add bottom margin to ensure content is visible */
 }
 
 body.dark-mode .login-card {
@@ -355,7 +366,7 @@ body.dark-mode .login-card {
 
 .logo h1 {
     font-size: 2rem;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--accent-primary);
 }
 
@@ -366,6 +377,10 @@ body.dark-mode .login-card {
 
 body.dark-mode .tagline {
     color: var(--dark-text-secondary);
+}
+
+.login-form-container {
+    margin-bottom: 20px; /* Add bottom margin */
 }
 
 .login-tabs {
@@ -477,6 +492,7 @@ body.dark-mode .form-group select {
     justify-content: center;
     gap: 10px;
     box-shadow: var(--shadow-md);
+    margin-top: 10px; /* Add top margin */
 }
 
 .btn-primary:hover {
@@ -501,6 +517,100 @@ body.dark-mode .form-group select {
 
 .auth-error.show {
     display: block;
+}
+
+/* Loading spinner */
+.loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-height: 700px) {
+    .login-screen {
+        padding: 10px;
+    }
+    
+    .login-container {
+        padding: 15px;
+        max-width: 100%;
+    }
+    
+    .login-card {
+        padding: 25px;
+        margin-bottom: 20px;
+    }
+    
+    .login-header {
+        margin-bottom: 20px;
+    }
+    
+    .logo i {
+        font-size: 2rem;
+    }
+    
+    .logo h1 {
+        font-size: 1.8rem;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .btn-primary {
+        padding: 12px 15px;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-container {
+        padding: 10px;
+    }
+    
+    .login-card {
+        padding: 20px;
+        border-radius: 15px;
+    }
+    
+    .logo i {
+        font-size: 1.8rem;
+    }
+    
+    .logo h1 {
+        font-size: 1.6rem;
+    }
+    
+    .login-tabs {
+        margin-bottom: 15px;
+    }
+    
+    .tab {
+        padding: 10px 5px;
+        font-size: 0.9rem;
+    }
+    
+    .form-group {
+        margin-bottom: 12px;
+    }
+    
+    .form-group input {
+        padding: 12px 15px 12px 40px;
+    }
+    
+    .btn-primary {
+        padding: 12px;
+        font-size: 0.9rem;
+    }
 }
 
 /* ===== Chat Screen ===== */
