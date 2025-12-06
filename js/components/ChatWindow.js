@@ -409,4 +409,15 @@ class ChatWindow {
     // Hide chat view
     hideChatView() {
         document.getElementById('chatView').classList.remove('active');
-        document.getElementById
+        document.getElementById('welcomeView').classList.add('active');
+    }
+
+    // Play notification sound
+    playNotificationSound() {
+        // In a real app, you would play an actual sound file
+        console.log('🔔 Notification sound played');
+    }
+}
+
+// Export singleton instance
+window.chatWindow = new ChatWindow();
