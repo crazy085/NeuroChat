@@ -238,19 +238,22 @@ class LoginScreen {
         }, 3000);
     }
 
-    // Show screen
-    show() {
-        this.screen.classList.add('active');
-    }
+// Show screen
+show() {
+    this.screen.classList.add('active');
+    // Make sure the screen is scrollable
+    this.screen.style.overflow = 'auto';
+    this.screen.style.height = 'auto';
+    this.screen.style.maxHeight = '100vh';
+}
 
-    // Hide screen
-    hide() {
-        this.screen.classList.remove('active');
-        // Clear forms
-        this.loginForm.reset();
-        this.signupForm.reset();
-        this.hideError();
-    }
+// Hide screen
+hide() {
+    this.screen.classList.remove('active');
+    // Clear forms
+    this.loginForm.reset();
+    this.signupForm.reset();
+    this.hideError();
 }
 
 // Export singleton instance
