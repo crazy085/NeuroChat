@@ -225,37 +225,72 @@ class NeuroChatApp {
         }
     }
 
-    // Show login screen
-    showLoginScreen() {
-        this.showScreen('login');
-        if (window.loginScreen) {
-            loginScreen.show();
+// Show login screen
+showLoginScreen() {
+    this.showScreen('login');
+    if (window.loginScreen) {
+        loginScreen.show();
+    }
+    
+    // Ensure the screen is scrollable
+    const loginScreenElement = document.getElementById('loginScreen');
+    if (loginScreenElement) {
+        loginScreenElement.style.overflow = 'auto';
+        loginScreenElement.style.height = 'auto';
+        loginScreenElement.style.maxHeight = '100vh';
+    }
+}
+
+// Show chat screen
+async showChatScreen() {
+    this.showScreen('chat');
+    
+    // Update user info in sidebar
+    this.updateUserInfo();
+    
+    // Load chats
+    if (window.chatList) {
+        chatList.loadChats();
+    }
+    
+    // Apply user settings
+    this.applyUserSettings();
+    
+    // Show welcome view if no chats
+    const chats = chatService.getChats();
+    if (chats.length === 0) {
+        document.getElementById('welcomeView').classList.add('active');
+        document.getElementById('chatView').classList.remove('active');
+    }
+}
+
+// Show screen
+showScreen(screenName) {
+    // Hide all screens
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+        screen.style.overflow = 'hidden'; // Hide overflow for inactive screens
+    });
+    
+    // Show target screen
+    const screen = document.getElementById(`${screenName}Screen`);
+    if (screen) {
+        screen.classList.add('active');
+        
+        // Make sure the screen is scrollable
+        if (screenName === 'login') {
+            screen.style.overflow = 'auto';
+            screen.style.height = 'auto';
+            screen.style.maxHeight = '100vh';
+        } else {
+            screen.style.overflow = 'hidden';
+            screen.style.height = '100vh';
         }
     }
-
-    // Show chat screen
-    async showChatScreen() {
-        this.showScreen('chat');
-        
-        // Update user info in sidebar
-        this.updateUserInfo();
-        
-        // Load chats
-        if (window.chatList) {
-            chatList.loadChats();
-        }
-        
-        // Apply user settings
-        this.applyUserSettings();
-        
-        // Show welcome view if no chats
-        const chats = chatService.getChats();
-        if (chats.length === 0) {
-            document.getElementById('welcomeView').classList.add('active');
-            document.getElementById('chatView').classList.remove('active');
-        }
-    }
-
+    
+    this.currentScreen = screenName;
+}
+    
     // Update user info in sidebar
     updateUserInfo() {
         const currentUser = authService.getCurrentUser();
