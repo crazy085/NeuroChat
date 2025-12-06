@@ -12,10 +12,15 @@ class NeuroChatApp {
             // Show loading screen
             this.showScreen('loading');
             
-            // Initialize services
+            // Check if required elements exist
+            if (!this.checkRequiredElements()) {
+                throw new Error('Required DOM elements not found');
+            }
+            
+            // Initialize services with error handling
             await this.initializeServices();
             
-            // Initialize components
+            // Initialize components with error handling
             this.initializeComponents();
             
             // Setup global event listeners
@@ -25,68 +30,114 @@ class NeuroChatApp {
             await this.checkAuthentication();
             
             this.isInitialized = true;
+            console.log('NeuroChat initialized successfully');
             
         } catch (error) {
             console.error('App initialization error:', error);
-            this.showError('Failed to initialize application');
+            this.showError('Failed to initialize application: ' + error.message);
+            
+            // Try to show login screen as fallback
+            setTimeout(() => {
+                this.showLoginScreen();
+            }, 1000);
         }
     }
 
-    // Initialize services
+    // Check if required DOM elements exist
+    checkRequiredElements() {
+        const requiredElements = [
+            'loadingScreen',
+            'loginScreen',
+            'chatScreen',
+            'modalOverlay'
+        ];
+        
+        for (const elementId of requiredElements) {
+            if (!document.getElementById(elementId)) {
+                console.error(`Required element not found: ${elementId}`);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    // Initialize services with error handling
     async initializeServices() {
         console.log('Initializing services...');
         
-        // Services are already initialized as singletons
-        // Just ensure they're ready
-        if (!window.storageService) {
-            throw new Error('Storage service not loaded');
+        try {
+            // Check if services are loaded
+            if (!window.storageService) {
+                throw new Error('Storage service not loaded');
+            }
+            
+            if (!window.authService) {
+                throw new Error('Auth service not loaded');
+            }
+            
+            if (!window.chatService) {
+                throw new Error('Chat service not loaded');
+            }
+            
+            if (!window.realtimeService) {
+                throw new Error('Realtime service not loaded');
+            }
+            
+            console.log('Services initialized');
+            
+        } catch (error) {
+            console.error('Service initialization error:', error);
+            throw error;
         }
-        
-        if (!window.authService) {
-            throw new Error('Auth service not loaded');
-        }
-        
-        if (!window.chatService) {
-            throw new Error('Chat service not loaded');
-        }
-        
-        if (!window.realtimeService) {
-            throw new Error('Realtime service not loaded');
-        }
-        
-        console.log('Services initialized');
     }
 
-    // Initialize components
+    // Initialize components with error handling
     initializeComponents() {
         console.log('Initializing components...');
         
-        // Initialize notification system
-        if (window.notificationSystem) {
-            console.log('Notification system ready');
+        try {
+            // Initialize notification system
+            if (window.notificationSystem) {
+                console.log('Notification system ready');
+            } else {
+                console.warn('Notification system not available');
+            }
+            
+            // Initialize modal system
+            if (window.modalSystem) {
+                console.log('Modal system ready');
+            } else {
+                console.warn('Modal system not available');
+            }
+            
+            // Initialize login screen
+            if (window.loginScreen) {
+                console.log('Login screen ready');
+            } else {
+                console.warn('Login screen not available');
+            }
+            
+            // Initialize chat list
+            if (window.chatList) {
+                console.log('Chat list ready');
+            } else {
+                console.warn('Chat list not available');
+            }
+            
+            // Initialize chat window
+            if (window.chatWindow) {
+                console.log('Chat window ready');
+            } else {
+                console.warn('Chat window not available');
+            }
+            
+            console.log('Components initialized');
+            
+        } catch (error) {
+            console.error('Component initialization error:', error);
+            throw error;
         }
-        
-        // Initialize modal system
-        if (window.modalSystem) {
-            console.log('Modal system ready');
-        }
-        
-        // Initialize login screen
-        if (window.loginScreen) {
-            console.log('Login screen ready');
-        }
-        
-        // Initialize chat list
-        if (window.chatList) {
-            console.log('Chat list ready');
-        }
-        
-        // Initialize chat window
-        if (window.chatWindow) {
-            console.log('Chat window ready');
-        }
-        
-        console.log('Components initialized');
     }
 
     // Setup global event listeners
@@ -111,6 +162,14 @@ class NeuroChatApp {
         
         // Setup button listeners
         this.setupButtonListeners();
+        
+        // Handle script loading errors
+        window.addEventListener('error', (e) => {
+            if (e.target.tagName === 'SCRIPT') {
+                console.error('Script loading error:', e.target.src, e.message);
+                this.showError('Failed to load a required script: ' + e.target.src);
+            }
+        }, true);
     }
 
     // Setup button listeners
@@ -119,7 +178,11 @@ class NeuroChatApp {
         const newChatBtn = document.getElementById('newChatBtn');
         if (newChatBtn) {
             newChatBtn.addEventListener('click', () => {
-                modalSystem.showNewChatModal();
+                if (window.modalSystem) {
+                    modalSystem.showNewChatModal();
+                } else {
+                    console.error('Modal system not available');
+                }
             });
         }
         
@@ -127,7 +190,11 @@ class NeuroChatApp {
         const welcomeNewChatBtn = document.getElementById('welcomeNewChatBtn');
         if (welcomeNewChatBtn) {
             welcomeNewChatBtn.addEventListener('click', () => {
-                modalSystem.showNewChatModal();
+                if (window.modalSystem) {
+                    modalSystem.showNewChatModal();
+                } else {
+                    console.error('Modal system not available');
+                }
             });
         }
         
@@ -135,7 +202,11 @@ class NeuroChatApp {
         const settingsBtn = document.getElementById('settingsBtn');
         if (settingsBtn) {
             settingsBtn.addEventListener('click', () => {
-                modalSystem.showSettingsModal();
+                if (window.modalSystem) {
+                    modalSystem.showSettingsModal();
+                } else {
+                    console.error('Modal system not available');
+                }
             });
         }
         
@@ -143,7 +214,11 @@ class NeuroChatApp {
         const profileBtn = document.getElementById('profileBtn');
         if (profileBtn) {
             profileBtn.addEventListener('click', () => {
-                modalSystem.showProfileModal();
+                if (window.modalSystem) {
+                    modalSystem.showProfileModal();
+                } else {
+                    console.error('Modal system not available');
+                }
             });
         }
         
@@ -199,7 +274,7 @@ class NeuroChatApp {
     // Check authentication
     async checkAuthentication() {
         try {
-            if (authService.isAuthenticated()) {
+            if (window.authService && authService.isAuthenticated()) {
                 await this.showChatScreen();
             } else {
                 this.showLoginScreen();
@@ -215,6 +290,7 @@ class NeuroChatApp {
         // Hide all screens
         document.querySelectorAll('.screen').forEach(screen => {
             screen.classList.remove('active');
+            screen.style.overflow = 'hidden'; // Hide overflow for inactive screens
         });
         
         // Show target screen
@@ -222,77 +298,53 @@ class NeuroChatApp {
         if (screen) {
             screen.classList.add('active');
             this.currentScreen = screenName;
-        }
-    }
-
-// Show login screen
-showLoginScreen() {
-    this.showScreen('login');
-    if (window.loginScreen) {
-        loginScreen.show();
-    }
-    
-    // Ensure the screen is scrollable
-    const loginScreenElement = document.getElementById('loginScreen');
-    if (loginScreenElement) {
-        loginScreenElement.style.overflow = 'auto';
-        loginScreenElement.style.height = 'auto';
-        loginScreenElement.style.maxHeight = '100vh';
-    }
-}
-
-// Show chat screen
-async showChatScreen() {
-    this.showScreen('chat');
-    
-    // Update user info in sidebar
-    this.updateUserInfo();
-    
-    // Load chats
-    if (window.chatList) {
-        chatList.loadChats();
-    }
-    
-    // Apply user settings
-    this.applyUserSettings();
-    
-    // Show welcome view if no chats
-    const chats = chatService.getChats();
-    if (chats.length === 0) {
-        document.getElementById('welcomeView').classList.add('active');
-        document.getElementById('chatView').classList.remove('active');
-    }
-}
-
-// Show screen
-showScreen(screenName) {
-    // Hide all screens
-    document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.remove('active');
-        screen.style.overflow = 'hidden'; // Hide overflow for inactive screens
-    });
-    
-    // Show target screen
-    const screen = document.getElementById(`${screenName}Screen`);
-    if (screen) {
-        screen.classList.add('active');
-        
-        // Make sure the screen is scrollable
-        if (screenName === 'login') {
+            
+            // Make sure the screen is scrollable
             screen.style.overflow = 'auto';
             screen.style.height = 'auto';
             screen.style.maxHeight = '100vh';
-        } else {
-            screen.style.overflow = 'hidden';
-            screen.style.height = '100vh';
         }
     }
-    
-    this.currentScreen = screenName;
-}
-    
+
+    // Show login screen
+    showLoginScreen() {
+        this.showScreen('login');
+        if (window.loginScreen) {
+            loginScreen.show();
+        }
+    }
+
+    // Show chat screen
+    async showChatScreen() {
+        this.showScreen('chat');
+        
+        // Update user info in sidebar
+        this.updateUserInfo();
+        
+        // Load chats
+        if (window.chatList) {
+            chatList.loadChats();
+        }
+        
+        // Apply user settings
+        this.applyUserSettings();
+        
+        // Show welcome view if no chats
+        const chats = window.chatService ? chatService.getChats() : [];
+        if (chats.length === 0) {
+            const welcomeView = document.getElementById('welcomeView');
+            const chatView = document.getElementById('chatView');
+            if (welcomeView && chatView) {
+                welcomeView.classList.add('active');
+                chatView.classList.remove('active');
+            }
+        }
+    }
+
     // Update user info in sidebar
     updateUserInfo() {
+        if (!window.authService) return;
+        
         const currentUser = authService.getCurrentUser();
         if (!currentUser) return;
         
@@ -318,6 +370,8 @@ showScreen(screenName) {
 
     // Apply user settings
     applyUserSettings() {
+        if (!window.authService) return;
+        
         const currentUser = authService.getCurrentUser();
         if (!currentUser || !currentUser.settings) return;
         
@@ -338,10 +392,14 @@ showScreen(screenName) {
     // Handle logout
     async handleLogout() {
         try {
-            await authService.logout();
+            if (window.authService) {
+                await authService.logout();
+            }
             
             // Clear current chat
-            chatService.setCurrentChat(null);
+            if (window.chatService) {
+                chatService.setCurrentChat(null);
+            }
             
             // Show login screen
             this.showLoginScreen();
@@ -377,7 +435,9 @@ showScreen(screenName) {
         }
         
         // Update user settings
-        authService.updateSettings({ darkMode: isDarkMode });
+        if (window.authService) {
+            authService.updateSettings({ darkMode: isDarkMode });
+        }
         
         // Update settings modal if open
         const darkModeSetting = document.getElementById('darkModeSetting');
@@ -434,7 +494,7 @@ showScreen(screenName) {
         const style = document.createElement('style');
         style.textContent = `
             .user-menu-item {
-                padding: 10px 15px;
+                padding:10px 15px;
                 display: flex;
                 align-items: center;
                 gap: 10px;
@@ -445,7 +505,7 @@ showScreen(screenName) {
                 background-color: var(--bg-hover);
             }
             .user-menu-item i {
-                width: 20px;
+                width:20px;
                 color: var(--text-muted);
             }
         `;
@@ -462,10 +522,14 @@ showScreen(screenName) {
                 
                 switch (action) {
                     case 'profile':
-                        modalSystem.showProfileModal();
+                        if (window.modalSystem) {
+                            modalSystem.showProfileModal();
+                        }
                         break;
                     case 'settings':
-                        modalSystem.showSettingsModal();
+                        if (window.modalSystem) {
+                            modalSystem.showSettingsModal();
+                        }
                         break;
                     case 'logout':
                         this.handleLogout();
@@ -506,32 +570,40 @@ showScreen(screenName) {
     async handleFileUpload(file) {
         try {
             // Show loading
-            notificationSystem.info(`Uploading ${file.name}...`);
+            if (window.notificationSystem) {
+                notificationSystem.info(`Uploading ${file.name}...`);
+            }
             
             // In a real app, you would upload to server
             // For demo, we'll create a local URL
             const fileUrl = URL.createObjectURL(file);
             
             // Send file message
-            const currentChat = chatService.getCurrentChat();
-            if (currentChat) {
-                await chatService.sendMessage(
-                    currentChat.id,
-                    file.name,
-                    this.getFileType(file.type),
-                    {
-                        url: fileUrl,
-                        name: file.name,
-                        size: file.size
+            if (window.chatService) {
+                const currentChat = chatService.getCurrentChat();
+                if (currentChat) {
+                    await chatService.sendMessage(
+                        currentChat.id,
+                        file.name,
+                        this.getFileType(file.type),
+                        {
+                            url: fileUrl,
+                            name: file.name,
+                            size: file.size
+                        }
+                    );
+                    
+                    if (window.notificationSystem) {
+                        notificationSystem.success(`${file.name} uploaded successfully`);
                     }
-                );
-                
-                notificationSystem.success(`${file.name} uploaded successfully`);
+                }
             }
             
         } catch (error) {
             console.error('File upload error:', error);
-            notificationSystem.error(`Failed to upload ${file.name}`);
+            if (window.notificationSystem) {
+                notificationSystem.error(`Failed to upload ${file.name}`);
+            }
         }
     }
 
@@ -555,7 +627,9 @@ showScreen(screenName) {
     // Start recording
     startRecording() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            notificationSystem.error('Voice recording not supported');
+            if (window.notificationSystem) {
+                notificationSystem.error('Voice recording not supported');
+            }
             return;
         }
         
@@ -573,18 +647,20 @@ showScreen(screenName) {
                     const audioUrl = URL.createObjectURL(audioBlob);
                     
                     // Send voice message
-                    const currentChat = chatService.getCurrentChat();
-                    if (currentChat) {
-                        chatService.sendMessage(
-                            currentChat.id,
-                            'Voice message',
-                            'audio',
-                            {
-                                url: audioUrl,
-                                name: `Voice ${Date.now()}.wav`,
-                                size: audioBlob.size
-                            }
-                        );
+                    if (window.chatService) {
+                        const currentChat = chatService.getCurrentChat();
+                        if (currentChat) {
+                            chatService.sendMessage(
+                                currentChat.id,
+                                'Voice message',
+                                'audio',
+                                {
+                                    url: audioUrl,
+                                    name: `Voice ${Date.now()}.wav`,
+                                    size: audioBlob.size
+                                }
+                            );
+                        }
                     }
                 };
                 
@@ -598,11 +674,15 @@ showScreen(screenName) {
                     voiceBtn.style.color = '#ff5252';
                 }
                 
-                notificationSystem.info('Recording... Click stop when done');
+                if (window.notificationSystem) {
+                    notificationSystem.info('Recording... Click stop when done');
+                }
             })
             .catch(error => {
                 console.error('Microphone access error:', error);
-                notificationSystem.error('Failed to access microphone');
+                if (window.notificationSystem) {
+                    notificationSystem.error('Failed to access microphone');
+                }
             });
     }
 
@@ -631,7 +711,10 @@ showScreen(screenName) {
         // Handle responsive layout
         if (window.innerWidth > 768) {
             // Desktop: show sidebar
-            document.getElementById('sidebar').classList.remove('hidden');
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                sidebar.classList.remove('hidden');
+            }
         }
     }
 
@@ -679,9 +762,11 @@ showScreen(screenName) {
             }
             
             // Mark messages as read
-            const currentChat = chatService.getCurrentChat();
-            if (currentChat) {
-                chatService.markAsRead(currentChat.id);
+            if (window.chatService) {
+                const currentChat = chatService.getCurrentChat();
+                if (currentChat) {
+                    chatService.markAsRead(currentChat.id);
+                }
             }
         }
     }
@@ -700,13 +785,17 @@ showScreen(screenName) {
         // Ctrl/Cmd + N: New chat
         if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
             e.preventDefault();
-            modalSystem.showNewChatModal();
+            if (window.modalSystem) {
+                modalSystem.showNewChatModal();
+            }
         }
         
         // Ctrl/Cmd + ,: Settings
         if ((e.ctrlKey || e.metaKey) && e.key === ',') {
             e.preventDefault();
-            modalSystem.showSettingsModal();
+            if (window.modalSystem) {
+                modalSystem.showSettingsModal();
+            }
         }
         
         // Escape: Close modals
@@ -728,31 +817,46 @@ showScreen(screenName) {
 
     // Show sidebar (mobile)
     showSidebar() {
-        document.getElementById('sidebar').classList.remove('hidden');
-        document.getElementById('welcomeView').classList.add('active');
-        document.getElementById('chatView').classList.remove('active');
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.classList.remove('hidden');
+        }
+        
+        const welcomeView = document.getElementById('welcomeView');
+        const chatView = document.getElementById('chatView');
+        if (welcomeView && chatView) {
+            welcomeView.classList.add('active');
+            chatView.classList.remove('active');
+        }
     }
 
     // Show error
     showError(message) {
+        // Create error element
         const errorDiv = document.createElement('div');
         errorDiv.style.cssText = `
             position: fixed;
-            top: 50%;
+            top: 20px;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
             background: #ff5252;
             color: white;
-            padding: 20px;
+            padding: 15px 20px;
             border-radius: 8px;
             z-index: 9999;
             text-align: center;
+            max-width: 80%;
+            box-shadow: var(--shadow-xl);
+            animation: fadeIn 0.3s ease;
         `;
         errorDiv.textContent = message;
         document.body.appendChild(errorDiv);
         
+        // Auto remove after 5 seconds
         setTimeout(() => {
-            errorDiv.remove();
+            if (errorDiv.parentNode) {
+                errorDiv.parentNode.removeChild(errorDiv);
+            }
         }, 5000);
     }
 
@@ -764,7 +868,8 @@ showScreen(screenName) {
             userAgent: navigator.userAgent,
             isOnline: navigator.onLine,
             isMobile: Helpers.isMobile(),
-            storage: storageService.getSize()
+            storage: window.storageService ? storageService.getSize() : 0,
+            initialized: this.isInitialized
         };
     }
 }
@@ -775,8 +880,38 @@ document.addEventListener('DOMContentLoaded', () => {
     window.app = new NeuroChatApp();
     
     // Make app globally accessible
-    console.log('NeuroChat initialized');
+    console.log('NeuroChat initializing...');
     console.log('App info:', window.app.getAppInfo());
+    
+    // Check if all required modules are loaded
+    setTimeout(() => {
+        const requiredModules = [
+            'Helpers',
+            'APP_CONSTANTS',
+            'USER_STATUS',
+            'CHAT_TYPES',
+            'MESSAGE_STATUS',
+            'STORAGE_KEYS',
+            'ERROR_MESSAGES',
+            'SUCCESS_MESSAGES',
+            'NOTIFICATION_TYPES',
+            'EMOJI_CATEGORIES'
+        ];
+        
+        let missingModules = [];
+        requiredModules.forEach(module => {
+            if (!window[module]) {
+                missingModules.push(module);
+            }
+        });
+        
+        if (missingModules.length > 0) {
+            console.error('Missing required modules:', missingModules);
+            window.app.showError('Failed to load required modules: ' + missingModules.join(', '));
+        } else {
+            console.log('All required modules loaded successfully');
+        }
+    }, 1000);
 });
 
 // Export for module systems
