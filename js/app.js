@@ -1,352 +1,321 @@
-// Main Application Module
+// Main Application Module with Real Chat
 class NeuroChat {
     constructor() {
+        this.currentUser = null;
         this.currentChat = null;
-        this.chats = [];
+        this.users = [];
         this.messages = {};
-        this.userProfile = {
-            name: 'Neural User',
-            status: 'Connected',
-            about: 'Exploring the neural network'
-        };
-        this.currentFilter = 'all';
+        this.socket = null;
+        this.typingTimers = {};
         this.init();
     }
 
     init() {
-        this.loadData();
-        this.initializeChats();
-        this.renderChatList();
-        this.startRealtimeSimulation();
-        
         // Initialize neural background
         if (window.neuralBg) {
             neuralBg.init('neuralBg');
         }
 
-        // Check server connection
-        this.checkServerConnection();
+        // App will be initialized after authentication
     }
 
-    async checkServerConnection() {
+    initWithAuth(token, user) {
+        this.currentUser = user;
+        this.socket = auth.initializeSocket();
+        this.setupSocketListeners();
+        this.loadUsers();
+        this.updateProfileModal();
+    }
+
+    setupSocketListeners() {
+        if (!this.socket) return;
+
+        this.socket.on('receive-message', (message) => {
+            this.handleIncomingMessage(message);
+        });
+
+        this.socket.on('user-typing', (data) => {
+            this.handleUserTyping(data);
+        });
+
+        this.socket.on('user-online', (data) => {
+            this.updateUserStatus(data.userId, true);
+        });
+
+        this.socket.on('user-offline', (data) => {
+            this.updateUserStatus(data.userId, false);
+        });
+
+        this.socket.on('message-sent', (message) => {
+            this.addMessageToChat(message);
+        });
+    }
+
+    async loadUsers() {
         try {
-            const response = await fetch('/api/health');
-            const data = await response.json();
-            console.log('Server status:', data);
-            ui.showToast('Connected to neural network');
-        } catch (error) {
-            console.log('Server connection failed, using local mode');
-            ui.showToast('Running in offline mode');
-        }
-    }
-
-    loadData() {
-        // Try to load from localStorage first
-        const savedChats = localStorage.getItem('neurochats');
-        const savedMessages = localStorage.getItem('neuromessages');
-        const savedProfile = localStorage.getItem('neuroprofile');
-        
-        if (savedChats) this.chats = JSON.parse(savedChats);
-        if (savedMessages) this.messages = JSON.parse(savedMessages);
-        if (savedProfile) this.userProfile = JSON.parse(savedProfile);
-    }
-
-    saveData() {
-        localStorage.setItem('neurochats', JSON.stringify(this.chats));
-        localStorage.setItem('neuromessages', JSON.stringify(this.messages));
-        localStorage.setItem('neuroprofile', JSON.stringify(this.userProfile));
-    }
-
-    initializeChats() {
-        if (this.chats.length === 0) {
-            this.chats = [
-                {
-                    id: 1,
-                    name: 'Alice Neural',
-                    avatar: 'alice',
-                    lastMessage: 'Neural connection established!',
-                    time: '10:30 AM',
-                    unread: 2,
-                    online: true,
-                    typing: false,
-                    category: 'recent'
-                },
-                {
-                    id: 2,
-                    name: 'Bob Synapse',
-                    avatar: 'bob',
-                    lastMessage: 'Transmitting data packet...',
-                    time: 'Yesterday',
-                    unread: 0,
-                    online: false,
-                    typing: false,
-                    category: 'recent'
-                },
-                {
-                    id: 3,
-                    name: 'Neural Collective',
-                    avatar: 'team',
-                    lastMessage: 'Syncing neural pathways',
-                    time: '2:15 PM',
-                    unread: 5,
-                    online: true,
-                    typing: false,
-                    category: 'groups'
-                },
-                {
-                    id: 4,
-                    name: 'Emma Cortex',
-                    avatar: 'emma',
-                    lastMessage: 'Signal strength: optimal',
-                    time: 'Monday',
-                    unread: 0,
-                    online: true,
-                    typing: false,
-                    category: 'recent'
-                },
-                {
-                    id: 5,
-                    name: 'AI Assistant',
-                    avatar: 'ai',
-                    lastMessage: 'Processing your request...',
-                    time: 'Just now',
-                    unread: 1,
-                    online: true,
-                    typing: true,
-                    category: 'recent'
-                }
-            ];
-            
-            // Initialize messages for each chat
-            this.chats.forEach(chat => {
-                if (!this.messages[chat.id]) {
-                    this.messages[chat.id] = [
-                        {
-                            id: 1,
-                            text: 'Neural link initiated! 🧠',
-                            sent: false,
-                            time: '10:00 AM',
-                            status: 'read'
-                        },
-                        {
-                            id: 2,
-                            text: 'Connection stable. Ready for data transmission.',
-                            sent: true,
-                            time: '10:01 AM',
-                            status: 'read'
-                        }
-                    ];
-                }
+            const response = await fetch('/api/users', {
+                headers: auth.getAuthHeaders()
             });
+
+            const data = await response.json();
+            if (response.ok) {
+                this.users = data.users;
+                this.renderUserList();
+            }
+        } catch (error) {
+            console.error('Load users error:', error);
+        }
+    }
+
+    renderUserList(filter = 'all') {
+        const chatList = document.getElementById('chatList');
+        chatList.innerHTML = '';
+
+        let filteredUsers = this.users;
+        
+        if (filter === 'online') {
+            filteredUsers = this.users.filter(user => user.isOnline);
+        }
+
+        filteredUsers.forEach(user => {
+            const userItem = document.createElement('div');
+            userItem.className = `chat-item ${this.currentChat?.id === user._id ? 'active' : ''}`;
+            userItem.onclick = () => this.selectUser(user);
             
-            this.saveData();
-        }
+            userItem.innerHTML = `
+                <div class="chat-avatar">
+                    <img src="${user.avatar}" alt="${user.username}">
+                    ${user.isOnline ? '<div class="online-indicator"></div>' : ''}
+                </div>
+                <div class="chat-info">
+                    <div class="chat-name">
+                        ${user.username}
+                        ${this.typingTimers[user._id] ? `
+                            <span class="typing-indicator">
+                                <span class="typing-dot"></span>
+                                <span class="typing-dot"></span>
+                                <span class="typing-dot"></span>
+                            </span>
+                        ` : ''}
+                    </div>
+                    <div class="chat-message">
+                        ${user.status || 'Active'}
+                    </div>
+                </div>
+                <div class="chat-meta">
+                    <div class="chat-time">${user.isOnline ? 'Online' : 'Offline'}</div>
+                </div>
+            `;
+            
+            chatList.appendChild(userItem);
+        });
     }
 
-    renderChatList(filter = this.currentFilter) {
-        let filteredChats = this.chats;
+    async selectUser(user) {
+        this.currentChat = user;
         
-        if (filter === 'recent') {
-            filteredChats = this.chats.filter(chat => chat.category === 'recent');
-        } else if (filter === 'groups') {
-            filteredChats = this.chats.filter(chat => chat.category === 'groups');
-        } else if (filter === 'unread') {
-            filteredChats = this.chats.filter(chat => chat.unread > 0);
-        }
+        document.getElementById('welcomeScreen').style.display = 'none';
+        document.getElementById('chatArea').classList.add('active');
         
-        ui.renderChatList(filteredChats, this.currentChat?.id);
+        document.getElementById('currentChatName').textContent = user.username;
+        document.getElementById('currentChatAvatar').src = user.avatar;
+        document.getElementById('onlineIndicator').style.display = user.isOnline ? 'block' : 'none';
+        document.getElementById('currentChatStatus').textContent = user.status || 'Active';
+        
+        await this.loadMessages(user._id);
+        this.renderUserList();
     }
 
-    selectChat(chat) {
-        this.currentChat = chat;
-        chat.unread = 0;
-        
-        ui.showChatArea();
-        ui.updateChatHeader(chat);
-        this.renderMessages();
-        this.renderChatList();
-        
-        // Simulate typing indicator
-        if (Math.random() > 0.7) {
-            setTimeout(() => this.simulateTyping(), 2000);
+    async loadMessages(userId) {
+        try {
+            const response = await fetch(`/api/messages/${userId}`, {
+                headers: auth.getAuthHeaders()
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                this.messages[userId] = data.messages;
+                this.renderMessages();
+            }
+        } catch (error) {
+            console.error('Load messages error:', error);
         }
     }
 
     renderMessages() {
-        const chatMessages = this.messages[this.currentChat.id] || [];
-        ui.renderMessages(chatMessages);
+        const container = document.getElementById('messagesContainer');
+        container.innerHTML = '';
+        
+        const messages = this.messages[this.currentChat._id] || [];
+        
+        messages.forEach(message => {
+            const messageDiv = document.createElement('div');
+            const isSent = message.sender._id === this.currentUser.id;
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="message-text">${message.content}</div>
+                    <div class="message-time">
+                        ${new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        ${isSent ? `
+                            <span class="message-status">
+                                ${message.isRead ? '✓✓' : '✓'}
+                            </span>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(messageDiv);
+        });
+        
+        container.scrollTop = container.scrollHeight;
     }
 
     sendMessage() {
         const text = ui.getInputValue();
         
-        if (!text || !this.currentChat) return;
+        if (!text || !this.currentChat || !this.socket) return;
         
-        const newMessage = {
-            id: Date.now(),
-            text: text,
-            sent: true,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            status: 'sent'
-        };
-        
-        if (!this.messages[this.currentChat.id]) {
-            this.messages[this.currentChat.id] = [];
-        }
-        
-        this.messages[this.currentChat.id].push(newMessage);
-        
-        // Update chat's last message
-        this.currentChat.lastMessage = text;
-        this.currentChat.time = 'Just now';
+        this.socket.emit('send-message', {
+            receiverId: this.currentChat._id,
+            content: text,
+            messageType: 'text'
+        });
         
         ui.clearInput();
-        this.renderMessages();
-        this.renderChatList();
-        this.saveData();
-        
-        // Simulate message status updates
-        setTimeout(() => {
-            newMessage.status = 'delivered';
-            this.renderMessages();
-        }, 1000);
-        
-        setTimeout(() => {
-            newMessage.status = 'read';
-            this.renderMessages();
-            this.simulateReply();
-        }, 2000);
-        
-        ui.showToast('Neural signal transmitted!');
     }
 
-    simulateReply() {
-        const replies = [
-            'Neural pathway activated! 🧠',
-            'Signal received and processed.',
-            'Transmitting response packet...',
-            'Connection strength: optimal.',
-            'Neural sync complete.',
-            'Data packet decoded successfully.',
-            'Quantum entanglement established.',
-            'Synaptic response initiated.'
-        ];
+    handleIncomingMessage(message) {
+        const senderId = message.sender._id;
         
-        setTimeout(() => {
-            const replyMessage = {
-                id: Date.now(),
-                text: replies[Math.floor(Math.random() * replies.length)],
-                sent: false,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                status: 'read'
-            };
-            
-            this.messages[this.currentChat.id].push(replyMessage);
-            this.currentChat.lastMessage = replyMessage.text;
-            this.currentChat.time = 'Just now';
-            
+        if (!this.messages[senderId]) {
+            this.messages[senderId] = [];
+        }
+        
+        this.messages[senderId].push(message);
+        
+        if (this.currentChat && this.currentChat._id === senderId) {
             this.renderMessages();
-            this.renderChatList();
-            this.saveData();
-            
-            ui.showToast('Incoming neural signal!');
-        }, 1500);
+        } else {
+            // Show notification for new message
+            ui.showToast(`New message from ${message.sender.username}`);
+        }
     }
 
-    simulateTyping() {
-        if (!this.currentChat) return;
+    handleUserTyping(data) {
+        const { userId, isTyping } = data;
         
-        const chat = this.chats.find(c => c.id === this.currentChat.id);
-        if (chat) {
-            chat.typing = true;
-            this.renderChatList();
+        if (isTyping) {
+            this.typingTimers[userId] = true;
+            clearTimeout(this.typingTimers[`${userId}_timeout`]);
             
-            setTimeout(() => {
-                chat.typing = false;
-                this.renderChatList();
-                this.simulateReply();
+            this.typingTimers[`${userId}_timeout`] = setTimeout(() => {
+                delete this.typingTimers[userId];
+                this.renderUserList();
             }, 3000);
+        } else {
+            delete this.typingTimers[userId];
+        }
+        
+        this.renderUserList();
+    }
+
+    updateUserStatus(userId, isOnline) {
+        const user = this.users.find(u => u._id === userId);
+        if (user) {
+            user.isOnline = isOnline;
+            this.renderUserList();
         }
     }
 
-    createNewChat() {
-        const name = prompt('Enter neural connection name:');
-        if (name) {
-            const newChat = {
-                id: Date.now(),
-                name: name,
-                avatar: name.toLowerCase().replace(' ', ''),
-                lastMessage: 'Neural link initiated',
-                time: 'Now',
-                unread: 0,
-                online: Math.random() > 0.5,
-                typing: false,
-                category: 'recent'
-            };
-            
-            this.chats.unshift(newChat);
-            this.messages[newChat.id] = [];
-            
-            this.saveData();
-            this.renderChatList();
-            this.selectChat(newChat);
-            
-            ui.showToast(`Neural connection established with ${name}`);
+    addMessageToChat(message) {
+        const receiverId = message.receiver._id;
+        
+        if (!this.messages[receiverId]) {
+            this.messages[receiverId] = [];
+        }
+        
+        this.messages[receiverId].push(message);
+        
+        if (this.currentChat && this.currentChat._id === receiverId) {
+            this.renderMessages();
         }
     }
 
-    searchChats() {
-        const searchTerm = ui.elements.searchInput.value.toLowerCase();
-        const filteredChats = this.chats.filter(chat => 
-            chat.name.toLowerCase().includes(searchTerm)
+    searchUsers() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const filteredUsers = this.users.filter(user => 
+            user.username.toLowerCase().includes(searchTerm)
         );
         
-        ui.renderChatList(filteredChats, this.currentChat?.id);
-    }
-
-    filterChats(category) {
-        this.currentFilter = category;
-        this.renderChatList(category);
-    }
-
-    saveProfile(event) {
-        event.preventDefault();
+        const chatList = document.getElementById('chatList');
+        chatList.innerHTML = '';
         
-        this.userProfile.name = document.getElementById('profileName').value;
-        this.userProfile.status = document.getElementById('profileStatus').value;
-        this.userProfile.about = document.getElementById('profileAbout').value;
-        
-        this.saveData();
-        ui.toggleModal(ui.elements.profileModal);
-        ui.showToast('Neural profile updated!');
-    }
-
-    startRealtimeSimulation() {
-        setInterval(() => {
-            // Randomly update online status
-            if (Math.random() > 0.9) {
-                const randomChat = this.chats[Math.floor(Math.random() * this.chats.length)];
-                randomChat.online = !randomChat.online;
-                this.renderChatList();
-            }
+        filteredUsers.forEach(user => {
+            const userItem = document.createElement('div');
+            userItem.className = `chat-item ${this.currentChat?._id === user._id ? 'active' : ''}`;
+            userItem.onclick = () => this.selectUser(user);
             
-            // Randomly add unread messages
-            if (Math.random() > 0.95 && this.currentChat) {
-                const otherChat = this.chats.find(c => c.id !== this.currentChat.id);
-                if (otherChat) {
-                    otherChat.unread = Math.floor(Math.random() * 5) + 1;
-                    otherChat.time = 'Just now';
-                    this.renderChatList();
-                }
-            }
-        }, 10000);
+            userItem.innerHTML = `
+                <div class="chat-avatar">
+                    <img src="${user.avatar}" alt="${user.username}">
+                    ${user.isOnline ? '<div class="online-indicator"></div>' : ''}
+                </div>
+                <div class="chat-info">
+                    <div class="chat-name">${user.username}</div>
+                    <div class="chat-message">${user.status || 'Active'}</div>
+                </div>
+                <div class="chat-meta">
+                    <div class="chat-time">${user.isOnline ? 'Online' : 'Offline'}</div>
+                </div>
+            `;
+            
+            chatList.appendChild(userItem);
+        });
+    }
+
+    filterUsers(category) {
+        // Update active category button
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        this.renderUserList(category);
+    }
+
+    updateProfileModal() {
+        if (this.currentUser) {
+            document.getElementById('profileUsername').value = this.currentUser.username;
+            document.getElementById('profileEmail').value = this.currentUser.email;
+            document.getElementById('profileStatus').value = this.currentUser.status || '';
+            document.getElementById('profileAbout').value = this.currentUser.about || '';
+        }
+    }
+
+    handleTyping() {
+        if (!this.currentChat || !this.socket) return;
+        
+        this.socket.emit('typing', {
+            receiverId: this.currentChat._id,
+            isTyping: true
+        });
+        
+        clearTimeout(this.typingTimeout);
+        this.typingTimeout = setTimeout(() => {
+            this.socket.emit('typing', {
+                receiverId: this.currentChat._id,
+                isTyping: false
+            });
+        }, 1000);
     }
 }
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new NeuroChat();
-    window.currentChat = window.app;
 });
 
 // Global functions for HTML event handlers
@@ -354,23 +323,19 @@ window.sendMessage = () => app.sendMessage();
 window.handleKeyPress = (event) => {
     if (event.key === 'Enter') {
         app.sendMessage();
+    } else {
+        app.handleTyping();
     }
 };
-window.searchChats = () => app.searchChats();
-window.filterChats = (category) => app.filterChats(category);
-window.createNewChat = () => app.createNewChat();
+window.searchUsers = () => app.searchUsers();
+window.filterUsers = (category) => app.filterUsers(category);
 window.toggleProfileModal = () => {
     ui.toggleModal(ui.elements.profileModal);
-    if (ui.elements.profileModal.classList.contains('show')) {
-        ui.updateProfileModal(app.userProfile);
-    }
+    app.updateProfileModal();
 };
-window.saveProfile = (event) => app.saveProfile(event);
 window.toggleEmojiPicker = () => ui.toggleEmojiPicker();
 window.insertEmoji = (emoji) => ui.insertEmoji(emoji);
-window.attachFile = () => ui.showToast('Neural file transfer coming soon!');
-window.toggleNotifications = () => ui.showToast('No new neural signals');
-window.toggleVideoCall = () => ui.showToast('Neural video call coming soon!');
-window.toggleVoiceCall = () => ui.showToast('Neural voice call coming soon!');
-window.toggleChatInfo = () => ui.showToast('Neural connection info coming soon!');
-window.selectChat = (chat) => app.selectChat(chat);
+window.attachFile = () => ui.showToast('File transfer coming soon!');
+window.toggleVideoCall = () => ui.showToast('Video call coming soon!');
+window.toggleVoiceCall = () => ui.showToast('Voice call coming soon!');
+window.toggleChatInfo = () => ui.showToast('Chat info coming soon!');
