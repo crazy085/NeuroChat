@@ -3,7 +3,6 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
@@ -38,124 +37,13 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('.'));
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/neurochat', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-}).then(() => {
-    console.log('🗄️ Connected to MongoDB');
-}).catch(err => {
-    console.error('❌ MongoDB connection error:', err);
-});
+// In-memory storage (for demo - replace with MongoDB later)
+let users = [];
+let messages = [];
+let connectedUsers = new Map();
 
-// User Schema
-const userSchema = new mongoose.Schema({
-    username: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true,
-        minlength: 3,
-        maxlength: 30
-    },
-    email: {
-        type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
-        validate: [validator.isEmail, 'Invalid email']
-    },
-    password: {
-        type: String,
-        required: true,
-        minlength: 6
-    },
-    avatar: {
-        type: String,
-        default: function() {
-            return `https://picsum.photos/seed/${this.username}/200/200`;
-        }
-    },
-    status: {
-        type: String,
-        default: 'Active',
-        enum: ['Active', 'Away', 'Busy', 'Offline']
-    },
-    about: {
-        type: String,
-        default: 'Exploring the neural network',
-        maxlength: 200
-    },
-    isOnline: {
-        type: Boolean,
-        default: false
-    },
-    lastSeen: {
-        type: Date,
-        default: Date.now
-    }
-}, {
-    timestamps: true
-});
-
-// Message Schema
-const messageSchema = new mongoose.Schema({
-    sender: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    receiver: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    content: {
-        type: String,
-        required: true,
-        maxlength: 1000
-    },
-    messageType: {
-        type: String,
-        default: 'text',
-        enum: ['text', 'image', 'file']
-    },
-    isRead: {
-        type: Boolean,
-        default: false
-    },
-    readAt: {
-        type: Date
-    }
-}, {
-    timestamps: true
-});
-
-// Chat Schema (for tracking conversations)
-const chatSchema = new mongoose.Schema({
-    participants: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    }],
-    lastMessage: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Message'
-    },
-    unreadCount: {
-        type: Map,
-        of: Number,
-        default: {}
-    }
-}, {
-    timestamps: true
-});
-
-const User = mongoose.model('User', userSchema);
-const Message = mongoose.model('Message', messageSchema);
-const Chat = mongoose.model('Chat', chatSchema);
-
-// Store connected users
-const connectedUsers = new Map();
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'neurochat-secret-key-2024';
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
@@ -166,7 +54,7 @@ const authenticateToken = (req, res, next) => {
         return res.status(401).json({ error: 'Access token required' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret', (err, user) => {
+    jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
             return res.status(403).json({ error: 'Invalid token' });
         }
@@ -174,6 +62,12 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
+
+// Helper functions
+const findUserByEmail = (email) => users.find(user => user.email === email);
+const findUserById = (id) => users.find(user => user.id === id);
+const findUserByUsername = (username) => users.find(user => user.username === username);
+const generateId = () => Math.random().toString(36).substr(2, 9);
 
 // API Routes
 
@@ -183,7 +77,9 @@ app.get('/api/health', (req, res) => {
         status: 'healthy', 
         timestamp: new Date().toISOString(),
         message: 'NeuroChat API is running',
-        connectedUsers: connectedUsers.size
+        connectedUsers: connectedUsers.size,
+        totalUsers: users.length,
+        totalMessages: messages.length
     });
 });
 
@@ -205,12 +101,12 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({
-            $or: [{ email }, { username }]
-        });
+        if (username.length < 3 || username.length > 30) {
+            return res.status(400).json({ error: 'Username must be 3-30 characters' });
+        }
 
-        if (existingUser) {
+        // Check if user already exists
+        if (findUserByEmail(email) || findUserByUsername(username)) {
             return res.status(400).json({ error: 'User already exists' });
         }
 
@@ -219,26 +115,35 @@ app.post('/api/auth/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Create new user
-        const user = new User({
+        const user = {
+            id: generateId(),
             username,
             email,
-            password: hashedPassword
-        });
+            password: hashedPassword,
+            avatar: `https://picsum.photos/seed/${username}/200/200`,
+            status: 'Active',
+            about: 'Exploring neural network',
+            isOnline: false,
+            lastSeen: new Date(),
+            createdAt: new Date()
+        };
 
-        await user.save();
+        users.push(user);
 
         // Generate JWT token
         const token = jwt.sign(
-            { userId: user._id, username: user.username },
-            process.env.JWT_SECRET || 'fallback-secret',
+            { userId: user.id, username: user.username },
+            JWT_SECRET,
             { expiresIn: '7d' }
         );
+
+        console.log(`👤 New user registered: ${username}`);
 
         res.status(201).json({
             message: 'User created successfully',
             token,
             user: {
-                id: user._id,
+                id: user.id,
                 username: user.username,
                 email: user.email,
                 avatar: user.avatar,
@@ -261,7 +166,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         // Find user
-        const user = await User.findOne({ email });
+        const user = findUserByEmail(email);
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -274,20 +179,21 @@ app.post('/api/auth/login', async (req, res) => {
 
         // Generate JWT token
         const token = jwt.sign(
-            { userId: user._id, username: user.username },
-            process.env.JWT_SECRET || 'fallback-secret',
+            { userId: user.id, username: user.username },
+            JWT_SECRET,
             { expiresIn: '7d' }
         );
 
         // Update last seen
         user.lastSeen = new Date();
-        await user.save();
+
+        console.log(`🔑 User logged in: ${user.username}`);
 
         res.json({
             message: 'Login successful',
             token,
             user: {
-                id: user._id,
+                id: user.id,
                 username: user.username,
                 email: user.email,
                 avatar: user.avatar,
@@ -301,13 +207,15 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Get current user info
-app.get('/api/user/me', authenticateToken, async (req, res) => {
+app.get('/api/user/me', authenticateToken, (req, res) => {
     try {
-        const user = await User.findById(req.user.userId).select('-password');
+        const user = findUserById(req.user.userId);
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json({ user });
+        
+        const { password, ...userWithoutPassword } = user;
+        res.json({ user: userWithoutPassword });
     } catch (error) {
         console.error('Get user error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -315,10 +223,10 @@ app.get('/api/user/me', authenticateToken, async (req, res) => {
 });
 
 // Update user profile
-app.put('/api/user/profile', authenticateToken, async (req, res) => {
+app.put('/api/user/profile', authenticateToken, (req, res) => {
     try {
         const { status, about } = req.body;
-        const user = await User.findById(req.user.userId);
+        const user = findUserById(req.user.userId);
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -327,18 +235,12 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
         if (status) user.status = status;
         if (about) user.about = about;
 
-        await user.save();
+        console.log(`📝 Profile updated: ${user.username}`);
 
+        const { password, ...userWithoutPassword } = user;
         res.json({
             message: 'Profile updated successfully',
-            user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                avatar: user.avatar,
-                status: user.status,
-                about: user.about
-            }
+            user: userWithoutPassword
         });
     } catch (error) {
         console.error('Update profile error:', error);
@@ -347,13 +249,15 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
 });
 
 // Get all users (for chat list)
-app.get('/api/users', authenticateToken, async (req, res) => {
+app.get('/api/users', authenticateToken, (req, res) => {
     try {
-        const users = await User.find({ _id: { $ne: req.user.userId } })
-            .select('username avatar status isOnline lastSeen')
-            .sort({ isOnline: -1, lastSeen: -1 });
+        const currentUserId = req.user.userId;
+        const otherUsers = users
+            .filter(user => user.id !== currentUserId)
+            .map(({ password, ...userWithoutPassword }) => userWithoutPassword)
+            .sort((a, b) => b.isOnline - a.isOnline);
 
-        res.json({ users });
+        res.json({ users: otherUsers });
     } catch (error) {
         console.error('Get users error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -361,28 +265,32 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 });
 
 // Get messages between two users
-app.get('/api/messages/:userId', authenticateToken, async (req, res) => {
+app.get('/api/messages/:userId', authenticateToken, (req, res) => {
     try {
         const { userId } = req.params;
         const currentUserId = req.user.userId;
 
-        const messages = await Message.find({
-            $or: [
-                { sender: currentUserId, receiver: userId },
-                { sender: userId, receiver: currentUserId }
-            ]
-        })
-        .populate('sender', 'username avatar')
-        .populate('receiver', 'username avatar')
-        .sort({ createdAt: 1 });
+        const userMessages = messages.filter(msg => 
+            (msg.sender === currentUserId && msg.receiver === userId) ||
+            (msg.sender === userId && msg.receiver === currentUserId)
+        ).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
         // Mark messages as read
-        await Message.updateMany(
-            { sender: userId, receiver: currentUserId, isRead: false },
-            { isRead: true, readAt: new Date() }
-        );
+        messages.forEach(msg => {
+            if (msg.sender === userId && msg.receiver === currentUserId && !msg.isRead) {
+                msg.isRead = true;
+                msg.readAt = new Date();
+            }
+        });
 
-        res.json({ messages });
+        // Add user info to messages
+        const messagesWithUsers = userMessages.map(msg => ({
+            ...msg,
+            sender: findUserById(msg.sender),
+            receiver: findUserById(msg.receiver)
+        }));
+
+        res.json({ messages: messagesWithUsers });
     } catch (error) {
         console.error('Get messages error:', error);
         res.status(500).json({ error: 'Server error' });
@@ -394,24 +302,23 @@ io.on('connection', (socket) => {
     console.log('🔌 User connected:', socket.id);
 
     // User authentication
-    socket.on('authenticate', async (token) => {
+    socket.on('authenticate', (token) => {
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-            const user = await User.findById(decoded.userId);
+            const decoded = jwt.verify(token, JWT_SECRET);
+            const user = findUserById(decoded.userId);
             
             if (user) {
-                socket.userId = user._id;
+                socket.userId = user.id;
                 socket.username = user.username;
-                connectedUsers.set(user._id.toString(), socket);
+                connectedUsers.set(user.id, socket);
                 
                 // Update user online status
                 user.isOnline = true;
                 user.lastSeen = new Date();
-                await user.save();
 
                 // Broadcast to all users that this user is online
                 io.emit('user-online', {
-                    userId: user._id,
+                    userId: user.id,
                     username: user.username
                 });
 
@@ -424,7 +331,7 @@ io.on('connection', (socket) => {
     });
 
     // Send message
-    socket.on('send-message', async (data) => {
+    socket.on('send-message', (data) => {
         try {
             if (!socket.userId) {
                 return socket.emit('error', 'Not authenticated');
@@ -432,28 +339,36 @@ io.on('connection', (socket) => {
 
             const { receiverId, content, messageType = 'text' } = data;
 
-            // Create and save message
-            const message = new Message({
+            // Create message
+            const message = {
+                id: generateId(),
                 sender: socket.userId,
                 receiver: receiverId,
                 content,
-                messageType
-            });
+                messageType,
+                isRead: false,
+                createdAt: new Date()
+            };
 
-            await message.save();
-            await message.populate('sender', 'username avatar');
-            await message.populate('receiver', 'username avatar');
+            messages.push(message);
+
+            // Add user info
+            const messageWithUsers = {
+                ...message,
+                sender: findUserById(socket.userId),
+                receiver: findUserById(receiverId)
+            };
 
             // Send to receiver if online
             const receiverSocket = connectedUsers.get(receiverId);
             if (receiverSocket) {
-                receiverSocket.emit('receive-message', message);
+                receiverSocket.emit('receive-message', messageWithUsers);
             }
 
             // Send confirmation to sender
-            socket.emit('message-sent', message);
+            socket.emit('message-sent', messageWithUsers);
 
-            console.log(`📨 Message from ${socket.username} to ${receiverId}`);
+            console.log(`📨 Message from ${socket.username} to ${findUserById(receiverId)?.username}`);
         } catch (error) {
             console.error('Send message error:', error);
             socket.emit('error', 'Failed to send message');
@@ -475,21 +390,22 @@ io.on('connection', (socket) => {
     });
 
     // Disconnect
-    socket.on('disconnect', async () => {
+    socket.on('disconnect', () => {
         if (socket.userId) {
-            connectedUsers.delete(socket.userId.toString());
+            connectedUsers.delete(socket.userId);
             
             // Update user offline status
-            await User.findByIdAndUpdate(socket.userId, {
-                isOnline: false,
-                lastSeen: new Date()
-            });
+            const user = findUserById(socket.userId);
+            if (user) {
+                user.isOnline = false;
+                user.lastSeen = new Date();
 
-            // Broadcast to all users that this user is offline
-            io.emit('user-offline', {
-                userId: socket.userId,
-                username: socket.username
-            });
+                // Broadcast to all users that this user is offline
+                io.emit('user-offline', {
+                    userId: user.id,
+                    username: user.username
+                });
+            }
 
             console.log(`❌ ${socket.username} disconnected`);
         }
@@ -506,4 +422,5 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🧠 NeuroChat server running on port ${PORT}`);
     console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
 });
