@@ -1,0 +1,82 @@
+/* Theme Variables and Color Schemes */
+:root {
+    --primary: #6a11cb;
+    --secondary: #2575fc;
+    --accent: #f093fb;
+    --dark: #0f0c29;
+    --darker: #030b18;
+    --light: #ffffff;
+    --text: #e0e0ff;
+    --text-secondary: #a0a0ff;
+    --glass: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    --neural-blue: #00d4ff;
+    --neural-purple: #8a2be2;
+    --neural-pink: #ff00ff;
+    --gradient-1: linear-gradient(120deg, #f093fb 0%, #f5576c 100%);
+    --gradient-2: linear-gradient(120deg, #4facfe 0%, #00f2fe 100%);
+    --gradient-3: linear-gradient(120deg, #43e97b 0%, #38f9d7 100%);
+    --gradient-4: linear-gradient(120deg, #fa709a 0%, #fee140 100%);
+    --gradient-5: linear-gradient(120deg, #30cfd0 0%, #330867 100%);
+}
+
+/* Dark Theme (Default) */
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: var(--darker);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Light Theme */
+body.light-theme {
+    --dark: #f0f2f5;
+    --darker: #ffffff;
+    --text: #1a1a2e;
+    --text-secondary: #666688;
+    --glass: rgba(0, 0, 0, 0.05);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* High Contrast Theme */
+body.high-contrast {
+    --primary: #00ff00;
+    --secondary: #00ffff;
+    --accent: #ffff00;
+    --dark: #000000;
+    --darker: #000000;
+    --text: #ffffff;
+    --text-secondary: #cccccc;
+    --glass: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --shadow: 0 8px 32px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Custom Theme Presets */
+.theme-cosmic {
+    --primary: #ff6b6b;
+    --secondary: #4ecdc4;
+    --accent: #ffe66d;
+    --gradient-1: linear-gradient(120deg, #ff6b6b 0%, #4ecdc4 100%);
+    --gradient-2: linear-gradient(120deg, #4ecdc4 0%, #44a08d 100%);
+}
+
+.theme-sunset {
+    --primary: #ff512f;
+    --secondary: #f09819;
+    --accent: #ffd89b;
+    --gradient-1: linear-gradient(120deg, #ff512f 0%, #dd2476 100%);
+    --gradient-2: linear-gradient(120deg, #f09819 0%, #edde5d 100%);
+}
+
+.theme-ocean {
+    --primary: #2193b0;
+    --secondary: #6dd5ed;
+    --accent: #ffffff;
+    --gradient-1: linear-gradient(120deg, #2193b0 0%, #6dd5ed 100%);
+    --gradient-2: linear-gradient(120deg, #6dd5ed 0%, #2193b0 100%);
+}
