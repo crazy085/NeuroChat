@@ -1,11 +1,13 @@
 /**
- * Neurochat Real-time Application Logic
+ * Neurochat Hybrid Application
+ * Real-time Socket.io + Local AI Simulation
  */
 const app = {
     state: {
         currentUser: 'Guest',
         activeChatId: null,
-        socket: null, // Socket.io instance
+        socket: null,
+        isSocketConnected: false,
         isMobile: window.innerWidth <= 768,
         contacts: [
             {
@@ -13,8 +15,9 @@ const app = {
                 name: "Sarah Connor",
                 avatar: "https://picsum.photos/seed/sarah/80/80",
                 status: "online",
-                messages: [], // Will be populated by socket history
-                unread: 0
+                messages: [],
+                unread: 0,
+                type: "human" // Real-time only
             },
             {
                 id: 2,
@@ -22,7 +25,8 @@ const app = {
                 avatar: "https://picsum.photos/seed/freeman/80/80",
                 status: "busy",
                 messages: [],
-                unread: 0
+                unread: 0,
+                type: "human"
             },
             {
                 id: 3,
@@ -30,7 +34,8 @@ const app = {
                 avatar: "https://picsum.photos/seed/ai/80/80",
                 status: "online",
                 messages: [],
-                unread: 0
+                unread: 0,
+                type: "ai" // Uses local bot simulation
             },
             {
                 id: 4,
@@ -38,7 +43,8 @@ const app = {
                 avatar: "https://picsum.photos/seed/design/80/80",
                 status: "offline",
                 messages: [],
-                unread: 0
+                unread: 0,
+                type: "human"
             },
             {
                 id: 5,
@@ -46,8 +52,19 @@ const app = {
                 avatar: "https://picsum.photos/seed/mom/80/80",
                 status: "online",
                 messages: [],
-                unread: 0
+                unread: 0,
+                type: "human"
             }
+        ],
+        botResponses: [
+            "Processing your request...",
+            "My neural pathways are aligned with that statement.",
+            "Data analyzed. Result positive.",
+            "Can you clarify the parameters?",
+            "I am updating my core database.",
+            "Connection stable. Go ahead.",
+            "That is fascinating data.",
+            "Executing protocol..."
         ]
     },
 
@@ -57,47 +74,79 @@ const app = {
         this.renderContactList();
         this.setupCanvas();
 
-        // Initialize Socket
-        this.initSocket();
-
         window.addEventListener('resize', () => {
             this.state.isMobile = window.innerWidth <= 768;
             this.handleResize();
         });
+
+        // Wait for Socket.io library to load, then connect
+        this.waitForSocket();
+    },
+
+    waitForSocket() {
+        const checkInterval = setInterval(() => {
+            if (typeof io !== 'undefined') {
+                clearInterval(checkInterval);
+                this.initSocket();
+            } else {
+                console.log("Waiting for Socket.io library...");
+            }
+        }, 100);
     },
 
     initSocket() {
-        // Connect to the same host
-        this.state.socket = io();
+        try {
+            this.state.socket = io();
 
-        // Listen for incoming messages
-        this.state.socket.on('receive_message', (data) => {
-            // If the message is for the currently open chat, render it
-            if (this.state.activeChatId === data.roomId) { // Note: server sends room context implicitly or we match ID
-                // In our simple setup, we know which room we are in via activeChatId
-                // But to be safe, we can assume the room matches the active chat if we joined it.
-                // For this specific implementation, let's append directly:
-                this.appendMessageToUI(data.text, data.sender, data.time);
-            } else {
-                // If it's for a chat not currently open, increment unread
-                const contact = this.state.contacts.find(c => c.id == data.roomId); // Assuming roomId maps to contact ID
-                if(contact) {
-                    contact.unread++;
-                    this.showToast(`New message from ${contact.name}`);
-                    this.renderContactList(this.dom.searchInput.value);
+            this.state.socket.on('connect', () => {
+                this.state.isSocketConnected = true;
+                this.updateConnectionStatus('Online', 'online');
+                console.log("Connected to Neural Network");
+            });
+
+            this.state.socket.on('disconnect', () => {
+                this.state.isSocketConnected = false;
+                this.updateConnectionStatus('Offline', 'offline');
+                console.log("Disconnected from Neural Network");
+            });
+
+            this.state.socket.on('receive_message', (data) => {
+                // Render message if we are in the chat
+                // We assume data contains: { text, sender, time }
+                // Note: In a robust app, we'd include roomId in data to double-check
+                
+                if (this.state.activeChatId) {
+                    // We render it directly
+                    this.appendMessageToUI(data.text, data.sender, data.time);
+                    
+                    // If it's not me, and it's for this chat, play sound or notify
+                    if (data.sender !== this.state.currentUser) {
+                        // Logic handled in appendMessageToUI
+                    }
                 }
-            }
-        });
+            });
 
-        // Listen for chat history when joining a room
-        this.state.socket.on('load_history', (history) => {
-            const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
-            if (contact) {
-                contact.messages = history;
-                this.renderMessages();
-                this.renderContactList(); // Update preview text
-            }
-        });
+            this.state.socket.on('load_history', (history) => {
+                const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
+                if (contact && contact.type !== 'ai') { // AI doesn't use socket history
+                    contact.messages = history;
+                    this.renderMessages();
+                    this.renderContactList();
+                }
+            });
+
+        } catch (e) {
+            console.error("Socket initialization failed:", e);
+            this.updateConnectionStatus('Connection Error', 'offline');
+        }
+    },
+
+    updateConnectionStatus(text, statusClass) {
+        const el = document.getElementById('connection-status');
+        if (el) {
+            el.textContent = text;
+            el.className = `status-text ${statusClass}`;
+        }
     },
 
     cacheDOM() {
@@ -105,6 +154,7 @@ const app = {
             authScreen: document.getElementById('auth-screen'),
             usernameInput: document.getElementById('username-input'),
             loginBtn: document.getElementById('login-btn'),
+            loginError: document.getElementById('login-error'),
             currentUserDisplay: document.getElementById('current-user-name'),
             sidebar: document.getElementById('sidebar'),
             chatList: document.getElementById('chat-list'),
@@ -125,7 +175,13 @@ const app = {
     },
 
     bindEvents() {
+        // Login Inputs - Allow Enter Key
+        this.dom.usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.login();
+        });
+
         this.dom.loginBtn.addEventListener('click', () => this.login());
+
         this.dom.sendBtn.addEventListener('click', () => this.sendMessage());
         this.dom.messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.sendMessage();
@@ -140,13 +196,10 @@ const app = {
             this.state.currentUser = username;
             this.dom.currentUserDisplay.textContent = username;
             this.dom.authScreen.classList.add('hidden');
-            
-            // Join a general connection (Optional)
-            // We join specific rooms in openChat()
-            
             this.showToast(`Welcome back, ${username}.`, 'success');
         } else {
-            this.showToast('Please enter a username.', 'error');
+            this.dom.loginError.textContent = "Please enter a valid username.";
+            this.dom.usernameInput.focus();
         }
     },
 
@@ -208,24 +261,19 @@ const app = {
         this.dom.activeStatus.textContent = contact.status === 'online' ? 'Online' : 'Last seen recently';
         this.dom.activeStatus.className = `status-text ${contact.status}`;
 
-        // SOCKET: Join the room for this chat
-        if(this.state.socket) {
+        // Logic: Socket vs Local
+        if (contact.type === 'human' && this.state.isSocketConnected) {
+            // Join room on server
             this.state.socket.emit('join', {
                 username: this.state.currentUser,
                 chatId: id
             });
+            // Clear local display, wait for history
+            this.dom.messagesContainer.innerHTML = ''; 
+        } else {
+            // AI or Offline Mode
+            this.renderMessages();
         }
-
-        // The messages will be populated by the 'load_history' event
-        // But we clear the view immediately for responsiveness
-        this.dom.messagesContainer.innerHTML = '';
-        const dateDiv = document.createElement('div');
-        dateDiv.style.textAlign = 'center';
-        dateDiv.style.color = 'var(--text-secondary)';
-        dateDiv.style.fontSize = '0.75rem';
-        dateDiv.style.margin = '10px 0';
-        dateDiv.innerText = 'Connected to Neural Network';
-        this.dom.messagesContainer.appendChild(dateDiv);
 
         this.renderContactList(this.dom.searchInput.value);
 
@@ -248,24 +296,21 @@ const app = {
     },
 
     renderMessages() {
-        // This is now primarily called after history loads
         const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
         if (!contact) return;
 
-        // Clear current except the "Connected" message (optional, simpler to just clear all)
         this.dom.messagesContainer.innerHTML = '';
 
-        // Re-add date header
         const dateDiv = document.createElement('div');
         dateDiv.style.textAlign = 'center';
         dateDiv.style.color = 'var(--text-secondary)';
         dateDiv.style.fontSize = '0.75rem';
         dateDiv.style.margin = '10px 0';
-        dateDiv.innerText = 'Today';
+        dateDiv.innerText = contact.type === 'ai' ? 'Connected to Neural Core' : 'Today';
         this.dom.messagesContainer.appendChild(dateDiv);
 
         contact.messages.forEach(msg => {
-            this.appendMessageToUI(msg.text, msg.sender, msg.time, false); // false = no scroll (we do it once at end)
+            this.appendMessageToUI(msg.text, msg.sender, msg.time, false);
         });
 
         this.scrollToBottom();
@@ -286,10 +331,10 @@ const app = {
         this.dom.messagesContainer.appendChild(div);
         if (autoScroll) this.scrollToBottom();
 
-        // Also update local state to keep it in sync
+        // Update local state
         const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
         if(contact) {
-            // Avoid duplicates if this was triggered by my own send
+            // Prevent duplicates
             const exists = contact.messages.find(m => m.time === time && m.text === text);
             if(!exists) {
                 contact.messages.push({ text, sender, time });
@@ -302,18 +347,48 @@ const app = {
         const text = this.dom.messageInput.value.trim();
         if (!text || !this.state.activeChatId) return;
 
-        // SOCKET: Emit message to server
-        if(this.state.socket) {
-            this.state.socket.emit('send_message', {
-                chatId: this.state.activeChatId,
-                text: text,
-                sender: this.state.currentUser
-            });
+        const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
+        const now = new Date();
+        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // 1. Handle Human Chat (Socket)
+        if (contact.type === 'human') {
+            if (this.state.isSocketConnected) {
+                this.state.socket.emit('send_message', {
+                    chatId: this.state.activeChatId,
+                    text: text,
+                    sender: this.state.currentUser
+                });
+            } else {
+                // Fallback if socket fails (visual only)
+                this.appendMessageToUI(text, this.state.currentUser, timeString);
+                this.showToast("Server offline. Message not sent.", "error");
+            }
+        } 
+        // 2. Handle AI Chat (Local Simulation)
+        else {
+            this.appendMessageToUI(text, this.state.currentUser, timeString);
+            this.simulateAiReply();
         }
 
         this.dom.messageInput.value = '';
-        // No need to manually call renderMessages here, 
-        // the server will broadcast back to us (and everyone else)
+    },
+
+    simulateAiReply() {
+        this.dom.typingIndicator.style.display = 'flex';
+        this.scrollToBottom();
+
+        const delay = Math.floor(Math.random() * 1500) + 500;
+
+        setTimeout(() => {
+            this.dom.typingIndicator.style.display = 'none';
+            
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const randomResponse = this.state.botResponses[Math.floor(Math.random() * this.state.botResponses.length)];
+
+            this.appendMessageToUI(randomResponse, 'Neural Core AI', timeString);
+        }, delay);
     },
 
     scrollToBottom() {
@@ -328,6 +403,9 @@ const app = {
         const toast = document.createElement('div');
         toast.className = 'toast';
         const icon = type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
+        if (type === 'error') {
+            toast.style.borderLeftColor = 'var(--danger)';
+        }
         toast.innerHTML = `<i class="fa-solid ${icon}"></i> ${message}`;
         
         this.dom.toastContainer.appendChild(toast);
@@ -355,7 +433,6 @@ const app = {
     },
 
     setupCanvas() {
-        // ... (Keep existing canvas code exactly as is) ...
         const canvas = document.getElementById('neural-canvas');
         const ctx = canvas.getContext('2d');
         let width, height;
