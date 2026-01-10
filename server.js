@@ -69,16 +69,17 @@ io.on('connection', (socket) => {
         const { chatId, text, sender } = data;
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        const messageData = { text, sender, time };
+        // FIXED: Include chatId in the data object
+        const messageData = { text, sender, time, chatId };
 
-        // Save history
+        // Save to history
         if (!chatHistory[chatId]) chatHistory[chatId] = [];
         chatHistory[chatId].push(messageData);
 
-        // Broadcast only to the specific private room
+        // Broadcast to everyone in this room
         io.to(chatId).emit('receive_message', messageData);
     });
-
+    
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
     });
