@@ -81,14 +81,14 @@ const app = {
         this.state.socket.on('connect', () => console.log("Connected"));
 
         this.state.socket.on('receive_message', (data) => {
-            // data: { text, sender, time }
-            // 1. Determine the chat ID (Me + Sender)
-            const chatId = this.getChatId(this.state.currentUser, data.sender);
+            // data now contains: { text, sender, time, chatId }
+            const chatId = data.chatId;
             
-            // 2. Does this contact exist in our list?
+            // 1. Does this contact exist in our list?
             let contact = this.state.contacts.find(c => c.id === chatId);
 
-            // If the sender is NOT me, and contact doesn't exist, create it!
+            // If sender is NOT me, and contact doesn't exist, create it!
+            // (This handles incoming messages from people you haven't chatted with yet)
             if (data.sender !== this.state.currentUser && !contact) {
                 contact = {
                     id: chatId,
@@ -97,13 +97,16 @@ const app = {
                     messages: [],
                     unread: 0
                 };
-                this.state.contacts.unshift(contact); // Add to top
+                this.state.contacts.unshift(contact);
                 this.showToast(`New message from ${data.sender}`);
             }
 
-            // 3. Add message data
+            // 2. If we have the contact (either existing or newly created), update it
             if (contact) {
+                // Add to local history
                 contact.messages.push(data);
+                
+                // 3. Update UI
                 if (this.state.activeChatId === chatId) {
                     this.appendMessageToUI(data.text, data.sender, data.time);
                 } else {
@@ -121,7 +124,6 @@ const app = {
             }
         });
     },
-
     // --- New Chat Logic ---
 
     toggleNewChatModal() {
