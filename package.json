@@ -1,7 +1,7 @@
 {
   "name": "neurochat",
   "version": "1.0.0",
-  "description": "Neurochat real-time web app",
+  "description": "Neurochat real-time web app with Auth",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
