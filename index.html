@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neurochat | Real-Time Secure Messaging</title>
-    
-    <!-- Fonts & Icons -->
+    <title>Neurochat | Private Messaging</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -13,29 +11,35 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Ambient Background -->
     <canvas id="neural-canvas"></canvas>
 
     <div class="app-container">
         
-        <!-- Login / Register Screen -->
+        <!-- Login Screen -->
         <div id="auth-screen">
             <div class="auth-card">
                 <div class="brand-logo"><i class="fa-solid fa-brain"></i> Neurochat</div>
-                
-                <!-- Tabs -->
                 <div class="auth-tabs">
                     <button class="auth-tab active" id="tab-login" onclick="app.switchAuthMode('login')">Login</button>
                     <button class="auth-tab" id="tab-register" onclick="app.switchAuthMode('register')">Register</button>
                 </div>
-
-                <!-- Messages -->
-                <div id="auth-message" style="text-align:center; font-size: 0.9rem; height: 20px; margin-bottom: 10px;"></div>
-
+                <div id="auth-message"></div>
                 <input type="text" class="auth-input" placeholder="Username" id="username-input">
                 <input type="password" class="auth-input" placeholder="Password" id="password-input">
-                
                 <button class="btn-primary" id="auth-btn">Connect</button>
+            </div>
+        </div>
+
+        <!-- New Chat Modal (Hidden by default) -->
+        <div id="new-chat-modal" class="modal hidden-modal">
+            <div class="modal-content">
+                <h3>Start New Chat</h3>
+                <p style="color:var(--text-secondary); font-size: 0.9rem; margin-bottom:15px;">Enter a registered username to start a private conversation.</p>
+                <input type="text" class="auth-input" placeholder="Search username..." id="new-chat-username">
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-secondary" onclick="app.toggleNewChatModal()">Cancel</button>
+                    <button class="btn-primary" onclick="app.startNewChat()">Start Chat</button>
+                </div>
             </div>
         </div>
 
@@ -43,75 +47,57 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="user-profile">
-                    <img src="https://picsum.photos/seed/me/80/80" alt="My Avatar" class="avatar">
+                    <img src="https://picsum.photos/seed/me/80/80" class="avatar">
                     <div>
                         <div style="font-weight: 600;" id="current-user-name">Guest</div>
                         <div class="status-text online">Online</div>
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button title="New Chat"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <!-- New Chat Button -->
+                    <button title="New Chat" onclick="app.toggleNewChatModal()"><i class="fa-solid fa-plus"></i></button>
                     <button title="Settings"><i class="fa-solid fa-gear"></i></button>
                 </div>
             </div>
             
-            <div class="search-bar">
-                <div class="search-input-wrapper">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" class="search-input" placeholder="Search connections..." id="search-input">
-                </div>
-            </div>
-
             <div class="chat-list" id="chat-list">
-                <!-- Chat Items Injected via JS -->
+                <!-- Dynamic Chats go here -->
+                <div class="empty-chats-hint" id="empty-chats-hint">
+                    <p>No chats yet.<br>Tap + to start one.</p>
+                </div>
             </div>
         </aside>
 
         <!-- Main Chat Interface -->
         <main class="chat-area" id="chat-area">
-            <!-- Default Empty State -->
             <div class="empty-state" id="empty-state">
-                <i class="fa-solid fa-comments"></i>
-                <h2>Welcome to Neurochat</h2>
-                <p>Select a connection to start communicating.</p>
+                <i class="fa-solid fa-lock"></i>
+                <h2>Private & Secure</h2>
+                <p>Select a chat to start messaging.</p>
             </div>
 
-            <!-- Active Chat View (Hidden initially) -->
             <div id="active-chat-view" class="hidden-view">
                 <header class="chat-view-header">
                     <div class="active-chat-info">
                         <button class="back-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
-                        <img src="" alt="" class="avatar" id="active-avatar">
+                        <img src="" class="avatar" id="active-avatar">
                         <div>
                             <div class="chat-name" id="active-name">User</div>
-                            <div class="status-text" id="active-status">Offline</div>
+                            <div class="status-text" id="active-status">Online</div>
                         </div>
-                    </div>
-                    <div class="header-actions">
-                        <button><i class="fa-solid fa-phone"></i></button>
-                        <button><i class="fa-solid fa-video"></i></button>
-                        <button><i class="fa-solid fa-circle-info"></i></button>
                     </div>
                 </header>
 
-                <div class="messages-container" id="messages-container">
-                    <!-- Messages Injected via JS -->
-                </div>
+                <div class="messages-container" id="messages-container"></div>
                 
-                <!-- Typing Indicator -->
                 <div class="typing-wrapper">
                     <div class="typing-indicator" id="typing-indicator">
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
+                        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
                     </div>
                 </div>
 
                 <div class="input-area">
-                    <button class="input-action-btn"><i class="fa-solid fa-plus"></i></button>
-                    <button class="input-action-btn"><i class="fa-regular fa-image"></i></button>
-                    <input type="text" class="message-input" placeholder="Type a message..." id="message-input">
-                    <button class="input-action-btn"><i class="fa-regular fa-face-smile"></i></button>
+                    <input type="text" class="message-input" placeholder="Type a secure message..." id="message-input">
                     <button class="send-btn" id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
                 </div>
             </div>
@@ -121,9 +107,7 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <!-- Socket.io Client -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <!-- Custom Scripts -->
     <script src="script.js"></script>
 </body>
 </html>
