@@ -6,20 +6,54 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Port from Render or default 10000
-const port = process.env.PORT || 10000;
+// Middleware to parse JSON
+app.use(express.json());
 
-// Serve static files
+// Static Files
 app.use(express.static(__dirname));
 
-// Store messages in memory (simple demo storage)
-// Structure: { chatId: [ { sender, text, time } ] }
+// --- IN-MEMORY DATABASE (For Demo Purposes) ---
+// In a production app, you would use MongoDB or PostgreSQL here.
+const users = {}; 
 const chatHistory = {};
+
+// --- AUTH ROUTES ---
+
+// Register Route
+app.post('/register', (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: "Username and password required" });
+    }
+
+    if (users[username]) {
+        return res.status(409).json({ success: false, message: "Username already taken" });
+    }
+
+    // Store user
+    users[username] = { password: password };
+    console.log(`User registered: ${username}`);
+    
+    res.json({ success: true, message: "Registration successful. Please login." });
+});
+
+// Login Route
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+
+    if (!users[username] || users[username].password !== password) {
+        return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+
+    res.json({ success: true, message: "Login successful", username });
+});
+
+// --- SOCKET.IO LOGIC ---
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    // 1. User joins a specific chat room (based on contact ID)
     socket.on('join', (data) => {
         const { username, chatId } = data;
         socket.join(chatId);
@@ -28,13 +62,15 @@ io.on('connection', (socket) => {
         
         console.log(`${username} joined room ${chatId}`);
 
-        // Send existing history to the new joiner
+        // Send existing history to the joiner
         if (chatHistory[chatId]) {
             socket.emit('load_history', chatHistory[chatId]);
+        } else {
+            // Initialize history if empty
+            chatHistory[chatId] = [];
         }
     });
 
-    // 2. User sends a message
     socket.on('send_message', (data) => {
         const { chatId, text, sender } = data;
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -45,10 +81,8 @@ io.on('connection', (socket) => {
         if (!chatHistory[chatId]) chatHistory[chatId] = [];
         chatHistory[chatId].push(messageData);
 
-        // Broadcast to everyone in this room (including sender)
+        // Broadcast to everyone in this room
         io.to(chatId).emit('receive_message', messageData);
-        
-        console.log(`Message in ${chatId}: ${text}`);
     });
 
     socket.on('disconnect', () => {
@@ -56,11 +90,10 @@ io.on('connection', (socket) => {
     });
 });
 
-// Fallback for routes (SPA handling)
+// Fallback for SPA
 app.get('*', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
-server.listen(port, '0.0.0.0', () => {
-    console.log(`Neurochat server listening on port ${port}`);
-});
+const port = process.env.PORT || 10000;
+server.listen(port, '0.0.0.
