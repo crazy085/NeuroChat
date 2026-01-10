@@ -95,5 +95,8 @@ app.get('*', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
+// --- START SERVER ---
 const port = process.env.PORT || 10000;
-server.listen(port, '0.0.0.
+server.listen(port, '0.0.0.0', () => {
+    console.log(`Neurochat server listening on port ${port}`);
+});
