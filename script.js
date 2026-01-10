@@ -1,70 +1,49 @@
 /**
- * Neurochat Hybrid Application
- * Real-time Socket.io + Local AI Simulation
+ * Neurochat Application Logic
+ * Real Auth + Real-time Socket.io
  */
 const app = {
     state: {
-        currentUser: 'Guest',
+        currentUser: null, // null until logged in
+        authToken: null,   // (Optional, for future expansion)
         activeChatId: null,
         socket: null,
-        isSocketConnected: false,
+        authMode: 'login', // 'login' or 'register'
         isMobile: window.innerWidth <= 768,
         contacts: [
             {
                 id: 1,
-                name: "Sarah Connor",
-                avatar: "https://picsum.photos/seed/sarah/80/80",
+                name: "Global Room",
+                avatar: "https://picsum.photos/seed/global/80/80",
                 status: "online",
-                messages: [],
-                unread: 0,
-                type: "human" // Real-time only
+                messages: [], // Clean slate
+                unread: 0
             },
             {
                 id: 2,
-                name: "Dr. Freeman",
-                avatar: "https://picsum.photos/seed/freeman/80/80",
-                status: "busy",
-                messages: [],
-                unread: 0,
-                type: "human"
-            },
-            {
-                id: 3,
                 name: "Neural Core AI",
                 avatar: "https://picsum.photos/seed/ai/80/80",
                 status: "online",
                 messages: [],
                 unread: 0,
-                type: "ai" // Uses local bot simulation
+                isAI: true // Flag for local simulation
             },
             {
-                id: 4,
-                name: "Design Team",
-                avatar: "https://picsum.photos/seed/design/80/80",
-                status: "offline",
-                messages: [],
-                unread: 0,
-                type: "human"
-            },
-            {
-                id: 5,
-                name: "Mom",
-                avatar: "https://picsum.photos/seed/mom/80/80",
+                id: 3,
+                name: "Tech Support",
+                avatar: "https://picsum.photos/seed/tech/80/80",
                 status: "online",
                 messages: [],
-                unread: 0,
-                type: "human"
+                unread: 0
             }
         ],
         botResponses: [
-            "Processing your request...",
-            "My neural pathways are aligned with that statement.",
-            "Data analyzed. Result positive.",
-            "Can you clarify the parameters?",
-            "I am updating my core database.",
-            "Connection stable. Go ahead.",
-            "That is fascinating data.",
-            "Executing protocol..."
+            "Systems nominal.",
+            "Analyzing input...",
+            "I can help you with that.",
+            "Data received.",
+            "Connection secure.",
+            "Executing query."
         ]
     },
 
@@ -79,82 +58,131 @@ const app = {
             this.handleResize();
         });
 
-        // Wait for Socket.io library to load, then connect
-        this.waitForSocket();
+        // Wait for DOM fully ready
     },
 
-    waitForSocket() {
-        const checkInterval = setInterval(() => {
-            if (typeof io !== 'undefined') {
-                clearInterval(checkInterval);
+    // --- Auth Logic ---
+
+    switchAuthMode(mode) {
+        this.state.authMode = mode;
+        const loginTab = document.getElementById('tab-login');
+        const registerTab = document.getElementById('tab-register');
+        const btn = document.getElementById('auth-btn');
+        const msg = document.getElementById('auth-message');
+
+        msg.textContent = "";
+        msg.style.color = "var(--text-secondary)";
+
+        if (mode === 'login') {
+            loginTab.classList.add('active');
+            registerTab.classList.remove('active');
+            btn.textContent = "Login";
+        } else {
+            registerTab.classList.add('active');
+            loginTab.classList.remove('active');
+            btn.textContent = "Create Account";
+        }
+    },
+
+    handleAuth() {
+        const username = this.dom.usernameInput.value.trim();
+        const password = this.dom.passwordInput.value.trim();
+        const msg = document.getElementById('auth-message');
+
+        if (!username || !password) {
+            msg.textContent = "Please fill in all fields";
+            msg.style.color = "var(--danger)";
+            return;
+        }
+
+        const url = this.state.authMode === 'register' ? '/register' : '/login';
+        const btn = document.getElementById('auth-btn');
+        const originalText = btn.textContent;
+
+        btn.textContent = "Processing...";
+        btn.disabled = true;
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+
+            if (data.success) {
+                // Successful Auth
+                this.state.currentUser = data.username;
+                this.dom.currentUserDisplay.textContent = data.username;
+                this.dom.authScreen.classList.add('hidden');
+                this.showToast(`Welcome, ${data.username}.`, 'success');
+                
+                // Initialize Socket connection AFTER login
                 this.initSocket();
             } else {
-                console.log("Waiting for Socket.io library...");
+                // Error
+                msg.textContent = data.message;
+                msg.style.color = "var(--danger)";
             }
-        }, 100);
+        })
+        .catch(err => {
+            console.error(err);
+            btn.textContent = originalText;
+            btn.disabled = false;
+            msg.textContent = "Server error. Try again later.";
+            msg.style.color = "var(--danger)";
+        });
     },
+
+    // --- Socket Logic ---
 
     initSocket() {
-        try {
-            this.state.socket = io();
-
-            this.state.socket.on('connect', () => {
-                this.state.isSocketConnected = true;
-                this.updateConnectionStatus('Online', 'online');
-                console.log("Connected to Neural Network");
-            });
-
-            this.state.socket.on('disconnect', () => {
-                this.state.isSocketConnected = false;
-                this.updateConnectionStatus('Offline', 'offline');
-                console.log("Disconnected from Neural Network");
-            });
-
-            this.state.socket.on('receive_message', (data) => {
-                // Render message if we are in the chat
-                // We assume data contains: { text, sender, time }
-                // Note: In a robust app, we'd include roomId in data to double-check
-                
-                if (this.state.activeChatId) {
-                    // We render it directly
-                    this.appendMessageToUI(data.text, data.sender, data.time);
-                    
-                    // If it's not me, and it's for this chat, play sound or notify
-                    if (data.sender !== this.state.currentUser) {
-                        // Logic handled in appendMessageToUI
-                    }
-                }
-            });
-
-            this.state.socket.on('load_history', (history) => {
-                const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
-                if (contact && contact.type !== 'ai') { // AI doesn't use socket history
-                    contact.messages = history;
-                    this.renderMessages();
-                    this.renderContactList();
-                }
-            });
-
-        } catch (e) {
-            console.error("Socket initialization failed:", e);
-            this.updateConnectionStatus('Connection Error', 'offline');
+        if (typeof io === 'undefined') {
+            console.error("Socket.io library not loaded");
+            return;
         }
+
+        this.state.socket = io();
+
+        this.state.socket.on('connect', () => {
+            console.log("Socket connected");
+        });
+
+        this.state.socket.on('receive_message', (data) => {
+            // If message belongs to active chat, render it
+            if (this.state.activeChatId) {
+                this.appendMessageToUI(data.text, data.sender, data.time);
+            } else {
+                // Logic to increment unread if chat is not active
+                const contact = this.state.contacts.find(c => c.id == data.roomId); 
+                // Note: Simple logic assumes roomId matches Contact ID for human chats
+                if(contact) {
+                    contact.unread++;
+                    this.renderContactList(this.dom.searchInput.value);
+                }
+            }
+        });
+
+        this.state.socket.on('load_history', (history) => {
+            const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
+            if (contact) {
+                contact.messages = history;
+                this.renderMessages();
+                this.renderContactList();
+            }
+        });
     },
 
-    updateConnectionStatus(text, statusClass) {
-        const el = document.getElementById('connection-status');
-        if (el) {
-            el.textContent = text;
-            el.className = `status-text ${statusClass}`;
-        }
-    },
+    // --- UI Logic ---
 
     cacheDOM() {
         this.dom = {
             authScreen: document.getElementById('auth-screen'),
             usernameInput: document.getElementById('username-input'),
-            loginBtn: document.getElementById('login-btn'),
-            loginError: document.getElementById('login-error'),
+            passwordInput: document.getElementById('password-input'),
+            authBtn: document.getElementById('auth-btn'),
             currentUserDisplay: document.getElementById('current-user-name'),
             sidebar: document.getElementById('sidebar'),
             chatList: document.getElementById('chat-list'),
@@ -175,32 +203,16 @@ const app = {
     },
 
     bindEvents() {
-        // Login Inputs - Allow Enter Key
-        this.dom.usernameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.login();
-        });
-
-        this.dom.loginBtn.addEventListener('click', () => this.login());
+        this.dom.authBtn.addEventListener('click', () => this.handleAuth());
+        
+        // Enter key for inputs
+        this.dom.usernameInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.dom.passwordInput.focus(); });
+        this.dom.passwordInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') this.handleAuth(); });
 
         this.dom.sendBtn.addEventListener('click', () => this.sendMessage());
-        this.dom.messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMessage();
-        });
+        this.dom.messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') this.sendMessage(); });
         this.dom.searchInput.addEventListener('input', (e) => this.filterContacts(e.target.value));
         this.dom.backBtn.addEventListener('click', () => this.closeChat());
-    },
-
-    login() {
-        const username = this.dom.usernameInput.value.trim();
-        if (username) {
-            this.state.currentUser = username;
-            this.dom.currentUserDisplay.textContent = username;
-            this.dom.authScreen.classList.add('hidden');
-            this.showToast(`Welcome back, ${username}.`, 'success');
-        } else {
-            this.dom.loginError.textContent = "Please enter a valid username.";
-            this.dom.usernameInput.focus();
-        }
     },
 
     renderContactList(filterText = '') {
@@ -223,9 +235,7 @@ const app = {
             item.className = `chat-item ${this.state.activeChatId === contact.id ? 'active' : ''}`;
             item.onclick = () => this.openChat(contact.id);
             
-            let unreadHTML = contact.unread > 0 
-                ? `<span class="unread-badge">${contact.unread}</span>` 
-                : '';
+            let unreadHTML = contact.unread > 0 ? `<span class="unread-badge">${contact.unread}</span>` : '';
 
             item.innerHTML = `
                 <img src="${contact.avatar}" class="avatar">
@@ -261,23 +271,21 @@ const app = {
         this.dom.activeStatus.textContent = contact.status === 'online' ? 'Online' : 'Last seen recently';
         this.dom.activeStatus.className = `status-text ${contact.status}`;
 
-        // Logic: Socket vs Local
-        if (contact.type === 'human' && this.state.isSocketConnected) {
-            // Join room on server
+        // Logic: Join Room (Socket) OR AI
+        if (!contact.isAI && this.state.socket) {
             this.state.socket.emit('join', {
                 username: this.state.currentUser,
                 chatId: id
             });
-            // Clear local display, wait for history
+            // Clear UI, wait for history
             this.dom.messagesContainer.innerHTML = ''; 
         } else {
-            // AI or Offline Mode
+            // AI Mode
             this.renderMessages();
         }
 
         this.renderContactList(this.dom.searchInput.value);
 
-        // Mobile Transitions
         if (this.state.isMobile) {
             this.dom.sidebar.classList.add('hidden-mobile');
             this.dom.chatArea.classList.add('active-mobile');
@@ -306,7 +314,7 @@ const app = {
         dateDiv.style.color = 'var(--text-secondary)';
         dateDiv.style.fontSize = '0.75rem';
         dateDiv.style.margin = '10px 0';
-        dateDiv.innerText = contact.type === 'ai' ? 'Connected to Neural Core' : 'Today';
+        dateDiv.innerText = 'Today';
         this.dom.messagesContainer.appendChild(dateDiv);
 
         contact.messages.forEach(msg => {
@@ -331,10 +339,8 @@ const app = {
         this.dom.messagesContainer.appendChild(div);
         if (autoScroll) this.scrollToBottom();
 
-        // Update local state
         const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
         if(contact) {
-            // Prevent duplicates
             const exists = contact.messages.find(m => m.time === time && m.text === text);
             if(!exists) {
                 contact.messages.push({ text, sender, time });
@@ -351,24 +357,18 @@ const app = {
         const now = new Date();
         const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        // 1. Handle Human Chat (Socket)
-        if (contact.type === 'human') {
-            if (this.state.isSocketConnected) {
-                this.state.socket.emit('send_message', {
-                    chatId: this.state.activeChatId,
-                    text: text,
-                    sender: this.state.currentUser
-                });
-            } else {
-                // Fallback if socket fails (visual only)
-                this.appendMessageToUI(text, this.state.currentUser, timeString);
-                this.showToast("Server offline. Message not sent.", "error");
-            }
-        } 
-        // 2. Handle AI Chat (Local Simulation)
-        else {
+        // AI Logic (Local)
+        if (contact.isAI) {
             this.appendMessageToUI(text, this.state.currentUser, timeString);
             this.simulateAiReply();
+        } 
+        // Human Logic (Socket)
+        else if (this.state.socket) {
+            this.state.socket.emit('send_message', {
+                chatId: this.state.activeChatId,
+                text: text,
+                sender: this.state.currentUser
+            });
         }
 
         this.dom.messageInput.value = '';
@@ -378,7 +378,7 @@ const app = {
         this.dom.typingIndicator.style.display = 'flex';
         this.scrollToBottom();
 
-        const delay = Math.floor(Math.random() * 1500) + 500;
+        const delay = Math.floor(Math.random() * 1000) + 500;
 
         setTimeout(() => {
             this.dom.typingIndicator.style.display = 'none';
@@ -405,8 +405,10 @@ const app = {
         const icon = type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
         if (type === 'error') {
             toast.style.borderLeftColor = 'var(--danger)';
+            toast.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${message}`;
+        } else {
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> ${message}`;
         }
-        toast.innerHTML = `<i class="fa-solid ${icon}"></i> ${message}`;
         
         this.dom.toastContainer.appendChild(toast);
 
@@ -433,6 +435,7 @@ const app = {
     },
 
     setupCanvas() {
+        // ... (Keep existing canvas code) ...
         const canvas = document.getElementById('neural-canvas');
         const ctx = canvas.getContext('2d');
         let width, height;
