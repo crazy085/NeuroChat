@@ -1,24 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurochat | Real-Time Secure Messaging</title>
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
 <body>
     <!-- Ambient Background -->
     <canvas id="neural-canvas"></canvas>
 
     <div class="app-container">
         
-        <!-- Login Screen -->
+        <!-- Login / Register Screen -->
         <div id="auth-screen">
             <div class="auth-card">
                 <div class="brand-logo"><i class="fa-solid fa-brain"></i> Neurochat</div>
-                <p class="auth-subtext">Connect via the Neural Network.</p>
                 
-                <div class="input-group">
-                    <input type="text" class="auth-input" placeholder="Enter Username" id="username-input" autofocus>
+                <!-- Tabs -->
+                <div class="auth-tabs">
+                    <button class="auth-tab active" id="tab-login" onclick="app.switchAuthMode('login')">Login</button>
+                    <button class="auth-tab" id="tab-register" onclick="app.switchAuthMode('register')">Register</button>
                 </div>
-                <div class="input-group">
-                    <input type="password" class="auth-input" placeholder="Password" value="********">
-                </div>
+
+                <!-- Messages -->
+                <div id="auth-message" style="text-align:center; font-size: 0.9rem; height: 20px; margin-bottom: 10px;"></div>
+
+                <input type="text" class="auth-input" placeholder="Username" id="username-input">
+                <input type="password" class="auth-input" placeholder="Password" id="password-input">
                 
-                <button class="btn-primary" id="login-btn">Initialize Link</button>
-                <div id="login-error" style="color: var(--danger); margin-top: 10px; font-size: 0.9rem;"></div>
+                <button class="btn-primary" id="auth-btn">Connect</button>
             </div>
         </div>
 
@@ -29,7 +46,7 @@
                     <img src="https://picsum.photos/seed/me/80/80" alt="My Avatar" class="avatar">
                     <div>
                         <div style="font-weight: 600;" id="current-user-name">Guest</div>
-                        <div class="status-text" id="connection-status">Connecting...</div>
+                        <div class="status-text online">Online</div>
                     </div>
                 </div>
                 <div class="header-actions">
@@ -104,8 +121,9 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <!-- Socket.io Client (Must be loaded before script.js) -->
+    <!-- Socket.io Client -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <!-- Custom Scripts -->
     <script src="script.js"></script>
 </body>
+</html>
