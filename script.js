@@ -1,11 +1,11 @@
 /**
- * Neurochat Application Logic
- * Handles authentication, state management, chat simulation, and UI rendering.
+ * Neurochat Real-time Application Logic
  */
 const app = {
     state: {
         currentUser: 'Guest',
         activeChatId: null,
+        socket: null, // Socket.io instance
         isMobile: window.innerWidth <= 768,
         contacts: [
             {
@@ -13,10 +13,7 @@ const app = {
                 name: "Sarah Connor",
                 avatar: "https://picsum.photos/seed/sarah/80/80",
                 status: "online",
-                messages: [
-                    { id: 1, text: "Have you seen the new neural interface update?", sender: "them", time: "10:30 AM" },
-                    { id: 2, text: "Yes, the latency is almost zero now.", sender: "me", time: "10:32 AM" }
-                ],
+                messages: [], // Will be populated by socket history
                 unread: 0
             },
             {
@@ -24,19 +21,15 @@ const app = {
                 name: "Dr. Freeman",
                 avatar: "https://picsum.photos/seed/freeman/80/80",
                 status: "busy",
-                messages: [
-                    { id: 1, text: "The resonance cascade scenario is unlikely.", sender: "them", time: "Yesterday" }
-                ],
-                unread: 1
+                messages: [],
+                unread: 0
             },
             {
                 id: 3,
                 name: "Neural Core AI",
                 avatar: "https://picsum.photos/seed/ai/80/80",
                 status: "online",
-                messages: [
-                    { id: 1, text: "System diagnostics complete. All neurons firing at 98%.", sender: "them", time: "09:00 AM" }
-                ],
+                messages: [],
                 unread: 0
             },
             {
@@ -52,20 +45,9 @@ const app = {
                 name: "Mom",
                 avatar: "https://picsum.photos/seed/mom/80/80",
                 status: "online",
-                messages: [
-                    { id: 1, text: "Don't forget to eat real food.", sender: "them", time: "Mon" }
-                ],
-                unread: 2
+                messages: [],
+                unread: 0
             }
-        ],
-        botResponses: [
-            "That is a fascinating perspective.",
-            "I am analyzing the data points you provided.",
-            "Connection stable. Please continue.",
-            "Can you elaborate on the neural implications?",
-            "Processing request... done. I agree.",
-            "That's exactly what I was thinking!",
-            "My logic circuits align with your statement."
         ]
     },
 
@@ -74,11 +56,47 @@ const app = {
         this.bindEvents();
         this.renderContactList();
         this.setupCanvas();
-        
-        // Handle Resize
+
+        // Initialize Socket
+        this.initSocket();
+
         window.addEventListener('resize', () => {
             this.state.isMobile = window.innerWidth <= 768;
             this.handleResize();
+        });
+    },
+
+    initSocket() {
+        // Connect to the same host
+        this.state.socket = io();
+
+        // Listen for incoming messages
+        this.state.socket.on('receive_message', (data) => {
+            // If the message is for the currently open chat, render it
+            if (this.state.activeChatId === data.roomId) { // Note: server sends room context implicitly or we match ID
+                // In our simple setup, we know which room we are in via activeChatId
+                // But to be safe, we can assume the room matches the active chat if we joined it.
+                // For this specific implementation, let's append directly:
+                this.appendMessageToUI(data.text, data.sender, data.time);
+            } else {
+                // If it's for a chat not currently open, increment unread
+                const contact = this.state.contacts.find(c => c.id == data.roomId); // Assuming roomId maps to contact ID
+                if(contact) {
+                    contact.unread++;
+                    this.showToast(`New message from ${contact.name}`);
+                    this.renderContactList(this.dom.searchInput.value);
+                }
+            }
+        });
+
+        // Listen for chat history when joining a room
+        this.state.socket.on('load_history', (history) => {
+            const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
+            if (contact) {
+                contact.messages = history;
+                this.renderMessages();
+                this.renderContactList(); // Update preview text
+            }
         });
     },
 
@@ -122,10 +140,13 @@ const app = {
             this.state.currentUser = username;
             this.dom.currentUserDisplay.textContent = username;
             this.dom.authScreen.classList.add('hidden');
+            
+            // Join a general connection (Optional)
+            // We join specific rooms in openChat()
+            
             this.showToast(`Welcome back, ${username}.`, 'success');
         } else {
             this.showToast('Please enter a username.', 'error');
-            this.dom.usernameInput.focus();
         }
     },
 
@@ -177,18 +198,35 @@ const app = {
         this.state.activeChatId = id;
         contact.unread = 0; 
         
-        // Update UI visibility
+        // UI Updates
         this.dom.emptyState.classList.add('hidden-view');
         this.dom.activeChatView.classList.remove('hidden-view');
         this.dom.activeChatView.classList.add('height-100');
         
-        // Update Header
         this.dom.activeName.textContent = contact.name;
         this.dom.activeAvatar.src = contact.avatar;
         this.dom.activeStatus.textContent = contact.status === 'online' ? 'Online' : 'Last seen recently';
         this.dom.activeStatus.className = `status-text ${contact.status}`;
 
-        this.renderMessages();
+        // SOCKET: Join the room for this chat
+        if(this.state.socket) {
+            this.state.socket.emit('join', {
+                username: this.state.currentUser,
+                chatId: id
+            });
+        }
+
+        // The messages will be populated by the 'load_history' event
+        // But we clear the view immediately for responsiveness
+        this.dom.messagesContainer.innerHTML = '';
+        const dateDiv = document.createElement('div');
+        dateDiv.style.textAlign = 'center';
+        dateDiv.style.color = 'var(--text-secondary)';
+        dateDiv.style.fontSize = '0.75rem';
+        dateDiv.style.margin = '10px 0';
+        dateDiv.innerText = 'Connected to Neural Network';
+        this.dom.messagesContainer.appendChild(dateDiv);
+
         this.renderContactList(this.dom.searchInput.value);
 
         // Mobile Transitions
@@ -201,7 +239,6 @@ const app = {
     },
 
     closeChat() {
-        // Mobile only action
         if (this.state.isMobile) {
             this.dom.chatArea.classList.remove('active-mobile');
             this.dom.sidebar.classList.remove('hidden-mobile');
@@ -211,11 +248,14 @@ const app = {
     },
 
     renderMessages() {
+        // This is now primarily called after history loads
         const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
         if (!contact) return;
 
+        // Clear current except the "Connected" message (optional, simpler to just clear all)
         this.dom.messagesContainer.innerHTML = '';
-        
+
+        // Re-add date header
         const dateDiv = document.createElement('div');
         dateDiv.style.textAlign = 'center';
         dateDiv.style.color = 'var(--text-secondary)';
@@ -225,71 +265,55 @@ const app = {
         this.dom.messagesContainer.appendChild(dateDiv);
 
         contact.messages.forEach(msg => {
-            const div = document.createElement('div');
-            div.className = `message ${msg.sender === 'me' ? 'sent' : 'received'}`;
-            div.innerHTML = `
-                ${msg.text}
-                <div class="message-meta">
-                    ${msg.time}
-                    ${msg.sender === 'me' ? '<i class="fa-solid fa-check-double"></i>' : ''}
-                </div>
-            `;
-            this.dom.messagesContainer.appendChild(div);
+            this.appendMessageToUI(msg.text, msg.sender, msg.time, false); // false = no scroll (we do it once at end)
         });
 
         this.scrollToBottom();
+    },
+
+    appendMessageToUI(text, sender, time, autoScroll = true) {
+        const div = document.createElement('div');
+        const isMe = sender === this.state.currentUser;
+        
+        div.className = `message ${isMe ? 'sent' : 'received'}`;
+        div.innerHTML = `
+            ${text}
+            <div class="message-meta">
+                ${time}
+                ${isMe ? '<i class="fa-solid fa-check-double"></i>' : ''}
+            </div>
+        `;
+        this.dom.messagesContainer.appendChild(div);
+        if (autoScroll) this.scrollToBottom();
+
+        // Also update local state to keep it in sync
+        const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
+        if(contact) {
+            // Avoid duplicates if this was triggered by my own send
+            const exists = contact.messages.find(m => m.time === time && m.text === text);
+            if(!exists) {
+                contact.messages.push({ text, sender, time });
+                this.renderContactList(this.dom.searchInput.value);
+            }
+        }
     },
 
     sendMessage() {
         const text = this.dom.messageInput.value.trim();
         if (!text || !this.state.activeChatId) return;
 
-        const contact = this.state.contacts.find(c => c.id === this.state.activeChatId);
-        const now = new Date();
-        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        contact.messages.push({
-            id: Date.now(),
-            text: text,
-            sender: 'me',
-            time: timeString
-        });
+        // SOCKET: Emit message to server
+        if(this.state.socket) {
+            this.state.socket.emit('send_message', {
+                chatId: this.state.activeChatId,
+                text: text,
+                sender: this.state.currentUser
+            });
+        }
 
         this.dom.messageInput.value = '';
-        this.renderMessages();
-        this.renderContactList(this.dom.searchInput.value);
-        this.simulateIncomingReply(contact);
-    },
-
-    simulateIncomingReply(contact) {
-        this.dom.typingIndicator.style.display = 'flex';
-        this.scrollToBottom();
-
-        const delay = Math.floor(Math.random() * 2000) + 1000;
-
-        setTimeout(() => {
-            this.dom.typingIndicator.style.display = 'none';
-            
-            const now = new Date();
-            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const randomResponse = this.state.botResponses[Math.floor(Math.random() * this.state.botResponses.length)];
-
-            contact.messages.push({
-                id: Date.now() + 1,
-                text: randomResponse,
-                sender: 'them',
-                time: timeString
-            });
-
-            if (this.state.activeChatId === contact.id) {
-                this.renderMessages();
-            } else {
-                contact.unread++;
-                this.showToast(`New message from ${contact.name}`);
-            }
-            this.renderContactList(this.dom.searchInput.value);
-
-        }, delay);
+        // No need to manually call renderMessages here, 
+        // the server will broadcast back to us (and everyone else)
     },
 
     scrollToBottom() {
@@ -331,6 +355,7 @@ const app = {
     },
 
     setupCanvas() {
+        // ... (Keep existing canvas code exactly as is) ...
         const canvas = document.getElementById('neural-canvas');
         const ctx = canvas.getContext('2d');
         let width, height;
@@ -396,7 +421,6 @@ const app = {
     }
 };
 
-// Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
